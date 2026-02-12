@@ -37,6 +37,7 @@ graph LR
 2. **정보 유출 방지:** 주민등록번호, 카드번호 등 개인정보 유출 탐지 및 차단
 3. **접근 제어:** 부정 로그인, 비정상 트래픽(Bot), 무차별 대입 공격 제어
 4. **규정 준수:** PCI DSS, 개인정보보호법 등 컴플라이언스 요건 충족
+   > **PCI DSS**(Payment Card Industry Data Security Standard): 카드 결제 정보를 안전하게 보호하기 위한 글로벌 보안 표준
 5. **가용성 보호:** L7 DDoS 등 애플리케이션 계층 공격으로부터 서비스 보호
 
 > **공항 보안에 비유하면?**
@@ -63,6 +64,7 @@ pie title 웹 보안 사고 유형별 비율 (Verizon DBIR 기반)
 ```
 
 * 전체 보안 침해 사고의 **약 43%가 웹 애플리케이션을 대상**으로 발생 (Verizon DBIR)
+  > **Verizon DBIR**(Data Breach Investigations Report): 보안 업계의 '연간 성적표'라고 불릴 만큼 권위 있는 사이버 보안 사고 분석 보고서
 * 웹 기반 비즈니스 확대에 따라 공격 표면(Attack Surface)이 지속 증가
 * 클라우드 전환, API 경제 확대로 보호 대상이 복잡해지는 추세
 
@@ -124,7 +126,7 @@ sequenceDiagram
 
 ## 3. 주요 방어 대상 (OWASP Top 10 - 2021)
 
-OWASP(Open Web Application Security Project)에서 발표하는 **가장 심각한 웹 보안 위협 10가지**를 중점 방어합니다.
+**OWASP**(Open Worldwide Application Security Project)는 소프트웨어 보안을 개선하기 위해 활동하는 글로벌 비영리 재단으로, **가장 심각한 웹 보안 위협 10가지**를 선정하여 발표합니다.
 
 ### 주요 항목 상세
 
