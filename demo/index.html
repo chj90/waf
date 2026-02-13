@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WAF Demo - Web Application Firewall</title>
+    <title>WAAP Demo - Web Application & API Protection</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -21,6 +21,7 @@
             --accent-yellow: #eab308;
             --accent-orange: #f97316;
             --accent-purple: #a855f7;
+            --accent-cyan: #06b6d4;
         }
 
         body {
@@ -34,7 +35,7 @@
         .header {
             background: linear-gradient(135deg, #111827 0%, #1e293b 100%);
             border-bottom: 1px solid var(--border);
-            padding: 16px 32px;
+            padding: 12px 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -47,14 +48,14 @@
         }
 
         .shield-icon {
-            width: 48px;
-            height: 48px;
+            width: 44px;
+            height: 44px;
             position: relative;
         }
 
         .shield-icon svg {
-            width: 48px;
-            height: 48px;
+            width: 44px;
+            height: 44px;
             filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.5));
             transition: filter 0.3s;
         }
@@ -68,37 +69,43 @@
         }
 
         .header-title h1 {
-            font-size: 24px;
+            font-size: 22px;
             font-weight: 700;
             letter-spacing: -0.5px;
         }
 
         .header-title p {
-            font-size: 13px;
+            font-size: 12px;
             color: var(--text-secondary);
         }
 
-        /* WAF Toggle */
-        .waf-toggle-area {
+        /* Toggle Controls */
+        .header-controls {
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 20px;
         }
 
-        .waf-status-label {
-            font-size: 14px;
+        .toggle-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .toggle-label {
+            font-size: 11px;
             font-weight: 600;
-            min-width: 80px;
+            min-width: 60px;
             text-align: right;
         }
 
-        .waf-status-label.on { color: var(--accent-green); }
-        .waf-status-label.off { color: var(--accent-red); }
+        .toggle-label.on { color: var(--accent-green); }
+        .toggle-label.off { color: var(--accent-red); }
 
         .toggle-switch {
             position: relative;
-            width: 64px;
-            height: 34px;
+            width: 48px;
+            height: 26px;
             cursor: pointer;
         }
 
@@ -108,17 +115,17 @@
             position: absolute;
             inset: 0;
             background: #374151;
-            border-radius: 34px;
+            border-radius: 26px;
             transition: 0.3s;
         }
 
         .toggle-slider::before {
             content: '';
             position: absolute;
-            height: 26px;
-            width: 26px;
-            left: 4px;
-            bottom: 4px;
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
             background: white;
             border-radius: 50%;
             transition: 0.3s;
@@ -126,51 +133,69 @@
 
         .toggle-switch input:checked + .toggle-slider {
             background: var(--accent-green);
-            box-shadow: 0 0 16px rgba(34, 197, 94, 0.4);
+            box-shadow: 0 0 12px rgba(34, 197, 94, 0.3);
         }
 
         .toggle-switch input:checked + .toggle-slider::before {
-            transform: translateX(30px);
+            transform: translateX(22px);
+        }
+
+        .toggle-divider {
+            width: 1px;
+            height: 28px;
+            background: var(--border);
         }
 
         /* Main Layout */
         .main-container {
             display: grid;
-            grid-template-columns: 1fr 400px;
+            grid-template-columns: 1fr 380px;
             gap: 0;
-            height: calc(100vh - 81px);
+            height: calc(100vh - 75px);
         }
 
-        /* Left Panel - Attack Tabs */
+        /* Left Panel */
         .attack-panel {
-            padding: 24px;
+            padding: 20px;
             overflow-y: auto;
+        }
+
+        /* Tab Groups */
+        .tab-group-label {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+            padding-left: 4px;
         }
 
         .tabs {
             display: flex;
-            gap: 4px;
-            margin-bottom: 20px;
+            gap: 3px;
+            margin-bottom: 8px;
             background: var(--bg-secondary);
-            border-radius: 12px;
-            padding: 4px;
+            border-radius: 10px;
+            padding: 3px;
         }
 
         .tab {
             flex: 1;
-            padding: 10px 12px;
+            padding: 8px 6px;
             border: none;
             background: transparent;
             color: var(--text-secondary);
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 500;
             cursor: pointer;
-            border-radius: 8px;
+            border-radius: 7px;
             transition: all 0.2s;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
+            gap: 4px;
+            white-space: nowrap;
         }
 
         .tab:hover { background: var(--bg-card); color: var(--text-primary); }
@@ -181,7 +206,12 @@
             box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
         }
 
-        .tab-icon { font-size: 16px; }
+        .tabs.waap-tabs .tab.active {
+            background: var(--accent-purple);
+            box-shadow: 0 2px 8px rgba(168, 85, 247, 0.3);
+        }
+
+        .tab-icon { font-size: 14px; }
 
         .tab-content { display: none; }
         .tab-content.active { display: block; }
@@ -195,46 +225,46 @@
         }
 
         .attack-header {
-            padding: 16px 20px;
+            padding: 14px 18px;
             background: rgba(0,0,0,0.2);
             border-bottom: 1px solid var(--border);
         }
 
         .attack-header h3 {
-            font-size: 16px;
+            font-size: 15px;
             margin-bottom: 4px;
         }
 
         .attack-header p {
-            font-size: 13px;
+            font-size: 12px;
             color: var(--text-secondary);
             line-height: 1.5;
         }
 
-        .attack-body { padding: 20px; }
+        .attack-body { padding: 16px 18px; }
 
         .form-group {
-            margin-bottom: 14px;
+            margin-bottom: 12px;
         }
 
         .form-group label {
             display: block;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 600;
             color: var(--text-secondary);
-            margin-bottom: 6px;
+            margin-bottom: 5px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
         .form-group input, .form-group textarea {
             width: 100%;
-            padding: 10px 14px;
+            padding: 9px 12px;
             background: var(--bg-input);
             border: 1px solid var(--border);
             border-radius: 8px;
             color: var(--text-primary);
-            font-size: 14px;
+            font-size: 13px;
             font-family: 'Consolas', 'Courier New', monospace;
             transition: border-color 0.2s;
         }
@@ -249,15 +279,15 @@
 
         /* Suggested Attacks */
         .suggested-attacks {
-            margin-bottom: 16px;
+            margin-bottom: 14px;
         }
 
         .suggested-attacks label {
             display: block;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 600;
             color: var(--text-secondary);
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
@@ -265,16 +295,16 @@
         .attack-chips {
             display: flex;
             flex-wrap: wrap;
-            gap: 6px;
+            gap: 5px;
         }
 
         .attack-chip {
-            padding: 6px 12px;
+            padding: 5px 10px;
             background: rgba(239, 68, 68, 0.1);
             border: 1px solid rgba(239, 68, 68, 0.3);
             border-radius: 6px;
             color: #fca5a5;
-            font-size: 12px;
+            font-size: 11px;
             font-family: 'Consolas', monospace;
             cursor: pointer;
             transition: all 0.2s;
@@ -297,15 +327,48 @@
             border-color: rgba(34, 197, 94, 0.5);
         }
 
+        .purple-chip {
+            background: rgba(168, 85, 247, 0.1);
+            border-color: rgba(168, 85, 247, 0.3);
+            color: #c4b5fd;
+        }
+
+        .purple-chip:hover {
+            background: rgba(168, 85, 247, 0.2);
+            border-color: rgba(168, 85, 247, 0.5);
+        }
+
+        .orange-chip {
+            background: rgba(249, 115, 22, 0.1);
+            border-color: rgba(249, 115, 22, 0.3);
+            color: #fdba74;
+        }
+
+        .orange-chip:hover {
+            background: rgba(249, 115, 22, 0.2);
+            border-color: rgba(249, 115, 22, 0.5);
+        }
+
+        .cyan-chip {
+            background: rgba(6, 182, 212, 0.1);
+            border-color: rgba(6, 182, 212, 0.3);
+            color: #67e8f9;
+        }
+
+        .cyan-chip:hover {
+            background: rgba(6, 182, 212, 0.2);
+            border-color: rgba(6, 182, 212, 0.5);
+        }
+
         /* Send Button */
         .btn-send {
             width: 100%;
-            padding: 12px;
+            padding: 10px;
             background: linear-gradient(135deg, var(--accent-blue), #2563eb);
             border: none;
             border-radius: 8px;
             color: white;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
@@ -322,31 +385,115 @@
 
         .btn-send:active { transform: translateY(0); }
 
+        .btn-send.purple {
+            background: linear-gradient(135deg, var(--accent-purple), #7c3aed);
+        }
+
+        .btn-send.purple:hover {
+            box-shadow: 0 4px 12px rgba(168, 85, 247, 0.4);
+        }
+
         /* Query Preview */
         .query-preview {
-            margin-top: 16px;
-            padding: 12px 16px;
+            margin-top: 14px;
+            padding: 10px 14px;
             background: var(--bg-input);
             border: 1px solid var(--border);
             border-radius: 8px;
             font-family: 'Consolas', monospace;
-            font-size: 12px;
+            font-size: 11px;
             color: var(--accent-yellow);
             line-height: 1.5;
             word-break: break-all;
         }
 
         .query-preview .label {
-            font-size: 11px;
+            font-size: 10px;
             color: var(--text-secondary);
             font-weight: 600;
             text-transform: uppercase;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
+        }
+
+        /* Info Box */
+        .info-box {
+            padding: 10px 14px;
+            background: rgba(59, 130, 246, 0.08);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 8px;
+            font-size: 12px;
+            color: #93c5fd;
+            margin-bottom: 14px;
+            line-height: 1.5;
+        }
+
+        .info-box.purple {
+            background: rgba(168, 85, 247, 0.08);
+            border-color: rgba(168, 85, 247, 0.2);
+            color: #c4b5fd;
+        }
+
+        .info-box strong {
+            color: var(--text-primary);
+        }
+
+        /* Live Status */
+        .live-status {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
+        }
+
+        .status-card {
+            flex: 1;
+            min-width: 100px;
+            padding: 10px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .status-card .status-label {
+            font-size: 10px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .status-card .status-value {
+            font-size: 20px;
+            font-weight: 700;
+            font-family: 'Consolas', monospace;
+        }
+
+        .status-card .status-value.green { color: var(--accent-green); }
+        .status-card .status-value.red { color: var(--accent-red); }
+        .status-card .status-value.yellow { color: var(--accent-yellow); }
+        .status-card .status-value.purple { color: var(--accent-purple); }
+        .status-card .status-value.cyan { color: var(--accent-cyan); }
+
+        /* Progress Bar */
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: var(--bg-input);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s, background-color 0.3s;
         }
 
         /* Response Area */
         .response-area {
-            margin-top: 16px;
+            margin-top: 14px;
             border-radius: 12px;
             overflow: hidden;
             animation: slideDown 0.3s ease;
@@ -372,35 +519,41 @@
             border: 1px solid rgba(249, 115, 22, 0.3);
         }
 
+        .response-challenge {
+            background: linear-gradient(135deg, rgba(234, 179, 8, 0.1), rgba(234, 179, 8, 0.05));
+            border: 1px solid rgba(234, 179, 8, 0.3);
+        }
+
         .response-header {
-            padding: 12px 16px;
+            padding: 10px 14px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
             font-weight: 600;
-            font-size: 14px;
+            font-size: 13px;
         }
 
         .response-blocked .response-header { color: var(--accent-red); }
         .response-passed .response-header { color: var(--accent-green); }
         .response-attack .response-header { color: var(--accent-orange); }
+        .response-challenge .response-header { color: var(--accent-yellow); }
 
-        .response-icon { font-size: 20px; }
+        .response-icon { font-size: 18px; }
 
         .response-body {
-            padding: 0 16px 14px;
-            font-size: 13px;
+            padding: 0 14px 12px;
+            font-size: 12px;
             line-height: 1.6;
         }
 
         .response-body pre {
             background: rgba(0,0,0,0.3);
-            padding: 10px 14px;
+            padding: 8px 12px;
             border-radius: 6px;
             font-family: 'Consolas', monospace;
-            font-size: 12px;
+            font-size: 11px;
             overflow-x: auto;
-            margin-top: 8px;
+            margin-top: 6px;
             white-space: pre-wrap;
             word-break: break-all;
         }
@@ -408,9 +561,9 @@
         .response-detail {
             display: grid;
             grid-template-columns: auto 1fr;
-            gap: 4px 12px;
-            font-size: 12px;
-            margin-top: 8px;
+            gap: 3px 10px;
+            font-size: 11px;
+            margin-top: 6px;
         }
 
         .response-detail dt {
@@ -422,7 +575,7 @@
             font-family: 'Consolas', monospace;
         }
 
-        /* Right Panel - WAF Logs */
+        /* Right Panel - Logs */
         .log-panel {
             background: var(--bg-secondary);
             border-left: 1px solid var(--border);
@@ -431,8 +584,51 @@
             height: 100%;
         }
 
+        .log-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .log-tab {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .log-tab:hover { background: rgba(255,255,255,0.03); }
+
+        .log-tab.active {
+            color: var(--text-primary);
+            border-bottom: 2px solid var(--accent-blue);
+        }
+
+        .log-tab.active.waap { border-bottom-color: var(--accent-purple); }
+
+        .log-tab-count {
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 8px;
+            font-weight: 700;
+        }
+
+        .log-tab .log-tab-count { background: var(--accent-blue); color: white; }
+        .log-tab.waap .log-tab-count { background: var(--accent-purple); color: white; }
+
+        .log-panel-content { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+        .log-panel-content.active { display: flex; }
+
         .log-header {
-            padding: 16px 20px;
+            padding: 10px 16px;
             border-bottom: 1px solid var(--border);
             display: flex;
             justify-content: space-between;
@@ -440,28 +636,28 @@
         }
 
         .log-header h2 {
-            font-size: 15px;
+            font-size: 13px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
         }
 
         .log-count {
             background: var(--accent-blue);
             color: white;
-            font-size: 11px;
-            padding: 2px 8px;
-            border-radius: 10px;
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 8px;
             font-weight: 600;
         }
 
         .btn-clear-logs {
-            padding: 6px 12px;
+            padding: 4px 10px;
             background: transparent;
             border: 1px solid var(--border);
             border-radius: 6px;
             color: var(--text-secondary);
-            font-size: 12px;
+            font-size: 11px;
             cursor: pointer;
             transition: all 0.2s;
         }
@@ -474,7 +670,7 @@
         .log-list {
             flex: 1;
             overflow-y: auto;
-            padding: 8px;
+            padding: 6px;
         }
 
         .log-empty {
@@ -482,19 +678,19 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 200px;
+            height: 160px;
             color: var(--text-secondary);
-            font-size: 14px;
-            gap: 8px;
+            font-size: 13px;
+            gap: 6px;
         }
 
-        .log-empty-icon { font-size: 32px; opacity: 0.5; }
+        .log-empty-icon { font-size: 28px; opacity: 0.5; }
 
         .log-entry {
-            padding: 10px 12px;
+            padding: 8px 10px;
             border-radius: 8px;
-            margin-bottom: 6px;
-            font-size: 12px;
+            margin-bottom: 4px;
+            font-size: 11px;
             animation: logSlide 0.3s ease;
             border: 1px solid transparent;
         }
@@ -523,13 +719,13 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 4px;
+            margin-bottom: 3px;
         }
 
         .log-entry-badge {
-            padding: 2px 8px;
+            padding: 1px 6px;
             border-radius: 4px;
-            font-size: 10px;
+            font-size: 9px;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -553,39 +749,40 @@
         .log-entry-time {
             font-family: 'Consolas', monospace;
             color: var(--text-secondary);
-            font-size: 11px;
+            font-size: 10px;
         }
 
         .log-entry-detail {
             color: var(--text-secondary);
             font-family: 'Consolas', monospace;
             line-height: 1.4;
+            font-size: 10px;
         }
 
         .log-entry-rule {
-            margin-top: 4px;
-            font-size: 11px;
+            margin-top: 3px;
+            font-size: 10px;
             color: var(--accent-yellow);
         }
 
         /* Stats Bar */
         .log-stats {
-            padding: 12px 20px;
+            padding: 10px 16px;
             border-top: 1px solid var(--border);
             display: flex;
-            gap: 16px;
-            font-size: 12px;
+            gap: 14px;
+            font-size: 11px;
         }
 
         .stat-item {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 5px;
         }
 
         .stat-dot {
-            width: 8px;
-            height: 8px;
+            width: 7px;
+            height: 7px;
             border-radius: 50%;
         }
 
@@ -597,18 +794,18 @@
 
         /* XSS Demo */
         .xss-render-area {
-            margin-top: 10px;
-            padding: 12px;
+            margin-top: 8px;
+            padding: 10px;
             background: white;
             color: #333;
             border-radius: 6px;
-            font-size: 13px;
+            font-size: 12px;
         }
 
         .xss-render-label {
-            font-size: 11px;
+            font-size: 10px;
             color: var(--text-secondary);
-            margin-bottom: 4px;
+            margin-bottom: 3px;
             font-weight: 600;
         }
 
@@ -641,6 +838,24 @@
         .severity-HIGH { background: rgba(239,68,68,0.2); color: #fca5a5; }
         .severity-MEDIUM { background: rgba(234,179,8,0.2); color: #fde047; }
         .severity-LOW { background: rgba(59,130,246,0.2); color: #93c5fd; }
+
+        /* Bot simulation progress */
+        .sim-progress {
+            margin-top: 10px;
+            padding: 10px 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 11px;
+            font-family: 'Consolas', monospace;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .sim-line { margin-bottom: 2px; }
+        .sim-line.ok { color: var(--accent-green); }
+        .sim-line.blocked { color: var(--accent-red); }
+        .sim-line.challenge { color: var(--accent-yellow); }
     </style>
 </head>
 <body>
@@ -656,16 +871,40 @@
             </svg>
         </div>
         <div class="header-title">
-            <h1>WAF Demo</h1>
-            <p>Web Application Firewall Interactive Demo</p>
+            <h1>WAAP Demo</h1>
+            <p>Web Application & API Protection Interactive Demo</p>
         </div>
     </div>
-    <div class="waf-toggle-area">
-        <span class="waf-status-label on" id="wafStatusLabel">WAF ON</span>
-        <label class="toggle-switch">
-            <input type="checkbox" id="wafToggle" checked>
-            <span class="toggle-slider"></span>
-        </label>
+    <div class="header-controls">
+        <div class="toggle-group">
+            <span class="toggle-label on" id="wafStatusLabel">WAF ON</span>
+            <label class="toggle-switch">
+                <input type="checkbox" id="wafToggle" checked>
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+        <div class="toggle-divider"></div>
+        <div class="toggle-group" title="API Security">
+            <span class="toggle-label on" id="apiLabel" style="min-width:30px;font-size:10px">API</span>
+            <label class="toggle-switch" style="width:40px;height:22px">
+                <input type="checkbox" id="apiToggle" checked>
+                <span class="toggle-slider" style="border-radius:22px"></span>
+            </label>
+        </div>
+        <div class="toggle-group" title="Bot Management">
+            <span class="toggle-label on" id="botLabel" style="min-width:30px;font-size:10px">BOT</span>
+            <label class="toggle-switch" style="width:40px;height:22px">
+                <input type="checkbox" id="botToggle" checked>
+                <span class="toggle-slider" style="border-radius:22px"></span>
+            </label>
+        </div>
+        <div class="toggle-group" title="DDoS Protection">
+            <span class="toggle-label on" id="ddosLabel" style="min-width:35px;font-size:10px">DDoS</span>
+            <label class="toggle-switch" style="width:40px;height:22px">
+                <input type="checkbox" id="ddosToggle" checked>
+                <span class="toggle-slider" style="border-radius:22px"></span>
+            </label>
+        </div>
     </div>
 </header>
 
@@ -674,8 +913,9 @@
 
     <!-- Left: Attack Panel -->
     <div class="attack-panel">
-        <!-- Tabs -->
-        <div class="tabs">
+        <!-- WAF Tabs -->
+        <div class="tab-group-label">WAF - Web Attack Defense</div>
+        <div class="tabs waf-tabs">
             <button class="tab active" data-tab="sqli">
                 <span class="tab-icon">&#x1f4be;</span> SQL Injection
             </button>
@@ -687,6 +927,20 @@
             </button>
             <button class="tab" data-tab="cmd">
                 <span class="tab-icon">&#x1f4bb;</span> Cmd Injection
+            </button>
+        </div>
+
+        <!-- WAAP Tabs -->
+        <div class="tab-group-label" style="margin-top:4px">WAAP - Advanced Protection</div>
+        <div class="tabs waap-tabs">
+            <button class="tab" data-tab="api">
+                <span class="tab-icon">&#x1f510;</span> API Security
+            </button>
+            <button class="tab" data-tab="bot">
+                <span class="tab-icon">&#x1f916;</span> Bot Management
+            </button>
+            <button class="tab" data-tab="ddos">
+                <span class="tab-icon">&#x1f30a;</span> DDoS Protection
             </button>
         </div>
 
@@ -825,36 +1079,192 @@
                 </div>
             </div>
         </div>
+
+        <!-- API Security Tab -->
+        <div class="tab-content" id="tab-api">
+            <div class="attack-card">
+                <div class="attack-header">
+                    <h3>API Security - BOLA / Rate Limiting</h3>
+                    <p>API 엔드포인트에 대한 비인가 접근(BOLA: Broken Object Level Authorization)을 탐지하고,<br>
+                    비정상적인 대량 API 호출을 Rate Limiting으로 차단합니다.</p>
+                </div>
+                <div class="attack-body">
+                    <div class="info-box purple">
+                        <strong>현재 인증:</strong> user1 (일반 사용자)로 로그인됨<br>
+                        <strong>내 주문:</strong> #5001 (노트북 Pro 15) | <strong>타인 주문:</strong> #5002~#5005
+                    </div>
+                    <div class="suggested-attacks">
+                        <label>Quick Test Scenarios</label>
+                        <div class="attack-chips">
+                            <span class="normal-chip attack-chip" onclick="fillAPI('5001')">내 주문 #5001 (정상)</span>
+                            <span class="purple-chip attack-chip" onclick="fillAPI('5002')">타인 주문 #5002 (BOLA)</span>
+                            <span class="purple-chip attack-chip" onclick="fillAPI('5003')">타인 주문 #5003 (BOLA)</span>
+                            <span class="attack-chip" onclick="sendAPIBurst()">연속 조회 10회 (Rate Limit)</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Order ID</label>
+                        <input type="text" id="api-order-id" placeholder="주문번호 입력 (예: 5001)...">
+                    </div>
+                    <button class="btn-send purple" onclick="sendAPI()">
+                        <span>&#x1f50d;</span> 주문 조회 요청 보내기
+                    </button>
+                    <div class="query-preview" id="api-preview" style="display:none">
+                        <div class="label">API Request</div>
+                        <div id="api-request-text"></div>
+                    </div>
+                    <div id="api-response"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bot Management Tab -->
+        <div class="tab-content" id="tab-bot">
+            <div class="attack-card">
+                <div class="attack-header">
+                    <h3>Bot Management - Automated Bot Detection</h3>
+                    <p>악성 봇의 자동화된 요청을 행위 분석과 요청 속도로 탐지합니다.<br>
+                    브라우저 핑거프린트, 마우스 이벤트 유무, 요청 빈도를 종합 분석합니다.</p>
+                </div>
+                <div class="attack-body">
+                    <div class="info-box">
+                        <strong>&#x1f3b5; <span id="bot-event-name">2025 Super Concert</span></strong><br>
+                        잔여 좌석: <strong><span id="bot-remaining">487</span></strong> / <span id="bot-total">500</span>
+                        <div class="progress-bar" style="margin-top:6px">
+                            <div class="progress-fill" id="bot-seat-bar" style="width:97.4%;background:var(--accent-green)"></div>
+                        </div>
+                    </div>
+                    <div class="suggested-attacks">
+                        <label>Quick Test Scenarios</label>
+                        <div class="attack-chips">
+                            <span class="normal-chip attack-chip" onclick="sendBotNormal()">정상 구매 (1매)</span>
+                            <span class="orange-chip attack-chip" onclick="sendBotFlood(10)">봇 시뮬레이션 (10회 연속)</span>
+                            <span class="orange-chip attack-chip" onclick="sendBotHeadless()">헤드리스 봇 (FP 없음)</span>
+                        </div>
+                    </div>
+                    <div class="live-status" id="bot-stats">
+                        <div class="status-card">
+                            <div class="status-label">Bot Score</div>
+                            <div class="status-value green" id="bot-score-display">0</div>
+                        </div>
+                        <div class="status-card">
+                            <div class="status-label">Requests/sec</div>
+                            <div class="status-value cyan" id="bot-rps-display">0</div>
+                        </div>
+                        <div class="status-card">
+                            <div class="status-label">Status</div>
+                            <div class="status-value green" id="bot-status-display">OK</div>
+                        </div>
+                    </div>
+                    <div id="bot-sim-progress" style="display:none"></div>
+                    <div id="bot-response"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DDoS Protection Tab -->
+        <div class="tab-content" id="tab-ddos">
+            <div class="attack-card">
+                <div class="attack-header">
+                    <h3>DDoS Protection - HTTP Flood Defense</h3>
+                    <p>HTTP Flood 공격(대량의 HTTP 요청)을 탐지하고 과도한 요청을 차단합니다.<br>
+                    10초간 20회 이상 요청 시 IP가 30초간 블랙리스트에 등록됩니다.</p>
+                </div>
+                <div class="attack-body">
+                    <div class="live-status">
+                        <div class="status-card">
+                            <div class="status-label">Requests (10s)</div>
+                            <div class="status-value cyan" id="ddos-req-count">0</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="ddos-req-bar" style="width:0%;background:var(--accent-green)"></div>
+                            </div>
+                        </div>
+                        <div class="status-card">
+                            <div class="status-label">Threshold</div>
+                            <div class="status-value yellow" id="ddos-threshold">20</div>
+                        </div>
+                        <div class="status-card">
+                            <div class="status-label">Status</div>
+                            <div class="status-value green" id="ddos-status-display">NORMAL</div>
+                        </div>
+                    </div>
+                    <div class="suggested-attacks">
+                        <label>Quick Test Scenarios</label>
+                        <div class="attack-chips">
+                            <span class="normal-chip attack-chip" onclick="sendDDoSNormal()">정상 요청 (1회)</span>
+                            <span class="cyan-chip attack-chip" onclick="sendDDoSFlood(25)">HTTP Flood (25회)</span>
+                            <span class="attack-chip" onclick="sendDDoSFlood(40)">Heavy Flood (40회)</span>
+                        </div>
+                    </div>
+                    <button class="btn-send purple" onclick="sendDDoSNormal()">
+                        <span>&#x1f4e1;</span> Health Check 요청
+                    </button>
+                    <div id="ddos-sim-progress" style="display:none"></div>
+                    <div id="ddos-response"></div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Right: Log Panel -->
     <div class="log-panel">
-        <div class="log-header">
-            <h2>
-                <span>&#x1f4cb;</span> WAF Logs
-                <span class="log-count" id="logCount">0</span>
-            </h2>
-            <button class="btn-clear-logs" onclick="clearLogs()">Clear</button>
+        <div class="log-tabs">
+            <button class="log-tab active" onclick="switchLogTab('waf')">
+                WAF Logs <span class="log-tab-count" id="wafLogCount">0</span>
+            </button>
+            <button class="log-tab waap" onclick="switchLogTab('waap')">
+                WAAP Logs <span class="log-tab-count" id="waapLogCount">0</span>
+            </button>
         </div>
-        <div class="log-list" id="logList">
-            <div class="log-empty" id="logEmpty">
-                <div class="log-empty-icon">&#x1f6e1;</div>
-                <div>아직 기록된 로그가 없습니다</div>
-                <div style="font-size:12px">공격을 시도하면 여기에 로그가 표시됩니다</div>
+
+        <!-- WAF Log Panel -->
+        <div class="log-panel-content active" id="waf-log-panel">
+            <div class="log-header">
+                <h2><span>&#x1f6e1;</span> WAF Events</h2>
+                <button class="btn-clear-logs" onclick="clearLogs('waf')">Clear</button>
+            </div>
+            <div class="log-list" id="wafLogList">
+                <div class="log-empty">
+                    <div class="log-empty-icon">&#x1f6e1;</div>
+                    <div>아직 WAF 로그가 없습니다</div>
+                </div>
+            </div>
+            <div class="log-stats">
+                <div class="stat-item">
+                    <div class="stat-dot blocked"></div>
+                    <span>차단: <span class="stat-value" id="wafStatBlocked">0</span></span>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-dot passed"></div>
+                    <span>정상: <span class="stat-value" id="wafStatPassed">0</span></span>
+                </div>
             </div>
         </div>
-        <div class="log-stats">
-            <div class="stat-item">
-                <div class="stat-dot blocked"></div>
-                <span>차단: <span class="stat-value" id="statBlocked">0</span></span>
+
+        <!-- WAAP Log Panel -->
+        <div class="log-panel-content" id="waap-log-panel">
+            <div class="log-header">
+                <h2><span>&#x1f510;</span> WAAP Events</h2>
+                <div style="display:flex;gap:6px">
+                    <button class="btn-clear-logs" onclick="resetWAAP()">Reset</button>
+                    <button class="btn-clear-logs" onclick="clearLogs('waap')">Clear</button>
+                </div>
             </div>
-            <div class="stat-item">
-                <div class="stat-dot attack"></div>
-                <span>공격 성공: <span class="stat-value" id="statAttack">0</span></span>
+            <div class="log-list" id="waapLogList">
+                <div class="log-empty">
+                    <div class="log-empty-icon">&#x1f510;</div>
+                    <div>아직 WAAP 로그가 없습니다</div>
+                </div>
             </div>
-            <div class="stat-item">
-                <div class="stat-dot passed"></div>
-                <span>정상: <span class="stat-value" id="statPassed">0</span></span>
+            <div class="log-stats">
+                <div class="stat-item">
+                    <div class="stat-dot blocked"></div>
+                    <span>차단: <span class="stat-value" id="waapStatBlocked">0</span></span>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-dot passed"></div>
+                    <span>정상: <span class="stat-value" id="waapStatPassed">0</span></span>
+                </div>
             </div>
         </div>
     </div>
@@ -889,16 +1299,33 @@
     function updateWAFStatus(enabled) {
         if (enabled) {
             wafStatusLabel.textContent = 'WAF ON';
-            wafStatusLabel.className = 'waf-status-label on';
+            wafStatusLabel.className = 'toggle-label on';
             shieldIcon.classList.add('active');
             wafToggle.checked = true;
         } else {
             wafStatusLabel.textContent = 'WAF OFF';
-            wafStatusLabel.className = 'waf-status-label off';
+            wafStatusLabel.className = 'toggle-label off';
             shieldIcon.classList.remove('active');
             wafToggle.checked = false;
         }
     }
+
+    // ========================
+    // WAAP Module Toggles
+    // ========================
+    function setupWAAPToggle(toggleId, labelId, endpoint) {
+        const toggle = document.getElementById(toggleId);
+        const label = document.getElementById(labelId);
+        toggle.addEventListener('change', async () => {
+            const res = await fetch(endpoint, { method: 'POST' });
+            const data = await res.json();
+            label.className = 'toggle-label ' + (data.enabled ? 'on' : 'off');
+        });
+    }
+
+    setupWAAPToggle('apiToggle', 'apiLabel', '/api/waap/api-security/toggle');
+    setupWAAPToggle('botToggle', 'botLabel', '/api/waap/bot-mgmt/toggle');
+    setupWAAPToggle('ddosToggle', 'ddosLabel', '/api/waap/ddos/toggle');
 
     // ========================
     // Fill Functions
@@ -920,15 +1347,18 @@
         document.getElementById('cmd-host').value = host;
     }
 
+    function fillAPI(orderId) {
+        document.getElementById('api-order-id').value = orderId;
+    }
+
     // ========================
-    // API Calls
+    // WAF API Calls
     // ========================
     async function sendSQLi() {
         const username = document.getElementById('sqli-username').value;
         const password = document.getElementById('sqli-password').value;
         if (!username) return;
 
-        // Show query preview
         const preview = document.getElementById('sqli-preview');
         const queryText = document.getElementById('sqli-query-text');
         preview.style.display = 'block';
@@ -942,7 +1372,7 @@
             const res = await fetch('/api/login', { method: 'POST', body: formData });
             const data = await res.json();
             showResponse('sqli-response', data);
-            refreshLogs();
+            refreshLogs('waf');
         } catch (e) {
             showErrorResponse('sqli-response', e.message);
         }
@@ -956,7 +1386,7 @@
             const res = await fetch('/api/search?q=' + encodeURIComponent(query));
             const data = await res.json();
             showResponse('xss-response', data);
-            refreshLogs();
+            refreshLogs('waf');
         } catch (e) {
             showErrorResponse('xss-response', e.message);
         }
@@ -970,7 +1400,7 @@
             const res = await fetch('/api/file?name=' + encodeURIComponent(filename));
             const data = await res.json();
             showResponse('path-response', data);
-            refreshLogs();
+            refreshLogs('waf');
         } catch (e) {
             showErrorResponse('path-response', e.message);
         }
@@ -984,7 +1414,6 @@
             const res = await fetch('/api/ping?host=' + encodeURIComponent(host));
             const data = await res.json();
 
-            // Show command preview
             if (data.simulatedCommand) {
                 const preview = document.getElementById('cmd-preview');
                 const cmdText = document.getElementById('cmd-command-text');
@@ -993,9 +1422,261 @@
             }
 
             showResponse('cmd-response', data);
-            refreshLogs();
+            refreshLogs('waf');
         } catch (e) {
             showErrorResponse('cmd-response', e.message);
+        }
+    }
+
+    // ========================
+    // WAAP API Calls - API Security
+    // ========================
+    async function sendAPI() {
+        const orderId = document.getElementById('api-order-id').value;
+        if (!orderId) return;
+
+        const preview = document.getElementById('api-preview');
+        const reqText = document.getElementById('api-request-text');
+        preview.style.display = 'block';
+        reqText.textContent = `GET /api/orders?id=${orderId}\nX-User-Token: user1`;
+
+        try {
+            const res = await fetch('/api/orders?id=' + encodeURIComponent(orderId), {
+                headers: { 'X-User-Token': 'user1' }
+            });
+            const data = await res.json();
+            showWAAPResponse('api-response', data);
+            refreshLogs('waap');
+        } catch (e) {
+            showErrorResponse('api-response', e.message);
+        }
+    }
+
+    async function sendAPIBurst() {
+        const progress = document.getElementById('api-response');
+        progress.innerHTML = '<div class="sim-progress" id="api-sim-log"></div>';
+        const log = document.getElementById('api-sim-log');
+
+        for (let i = 1; i <= 12; i++) {
+            const orderId = '5001';
+            try {
+                const res = await fetch('/api/orders?id=' + orderId, {
+                    headers: { 'X-User-Token': 'user1' }
+                });
+                const data = await res.json();
+                const line = document.createElement('div');
+                line.className = 'sim-line ' + (data.blocked ? 'blocked' : 'ok');
+                line.textContent = `[${i}/12] GET /api/orders?id=${orderId} → ${data.blocked ? 'BLOCKED (' + (data.reason || 'RATE_LIMIT') + ')' : 'OK (count: ' + (data.requestCount || '?') + ')'}`;
+                log.appendChild(line);
+                log.scrollTop = log.scrollHeight;
+            } catch (e) {
+                const line = document.createElement('div');
+                line.className = 'sim-line blocked';
+                line.textContent = `[${i}/12] Error: ${e.message}`;
+                log.appendChild(line);
+            }
+            await sleep(80);
+        }
+        refreshLogs('waap');
+    }
+
+    // ========================
+    // WAAP API Calls - Bot Management
+    // ========================
+    async function sendBotNormal() {
+        try {
+            const res = await fetch('/api/tickets/purchase', {
+                method: 'POST',
+                headers: {
+                    'X-Mouse-Events': 'true',
+                    'X-Browser-FP': 'true'
+                }
+            });
+            const data = await res.json();
+            updateBotStats(data);
+            showWAAPResponse('bot-response', data);
+            refreshLogs('waap');
+            refreshTicketStatus();
+        } catch (e) {
+            showErrorResponse('bot-response', e.message);
+        }
+    }
+
+    async function sendBotFlood(count) {
+        const container = document.getElementById('bot-sim-progress');
+        container.style.display = 'block';
+        container.innerHTML = '';
+        const log = document.createElement('div');
+        log.className = 'sim-progress';
+        container.appendChild(log);
+
+        for (let i = 1; i <= count; i++) {
+            try {
+                const res = await fetch('/api/tickets/purchase', {
+                    method: 'POST',
+                    headers: {
+                        'X-Mouse-Events': 'false',
+                        'X-Browser-FP': 'true'
+                    }
+                });
+                const data = await res.json();
+                updateBotStats(data);
+                const line = document.createElement('div');
+                if (data.blocked && data.challengeIssued) {
+                    line.className = 'sim-line challenge';
+                    line.textContent = `[${i}/${count}] CAPTCHA CHALLENGE - Bot Score: ${data.botScore}, RPS: ${(data.requestsPerSec||0).toFixed(1)}`;
+                } else if (data.blocked) {
+                    line.className = 'sim-line blocked';
+                    line.textContent = `[${i}/${count}] BLOCKED - ${data.reason} - Bot Score: ${data.botScore}`;
+                } else {
+                    line.className = 'sim-line ok';
+                    line.textContent = `[${i}/${count}] OK - Ticket purchased! Remaining: ${data.remaining}`;
+                }
+                log.appendChild(line);
+                log.scrollTop = log.scrollHeight;
+            } catch (e) {
+                const line = document.createElement('div');
+                line.className = 'sim-line blocked';
+                line.textContent = `[${i}/${count}] Error: ${e.message}`;
+                log.appendChild(line);
+            }
+            await sleep(50);
+        }
+        refreshLogs('waap');
+        refreshTicketStatus();
+    }
+
+    async function sendBotHeadless() {
+        try {
+            const res = await fetch('/api/tickets/purchase', {
+                method: 'POST',
+                headers: {
+                    'X-Mouse-Events': 'false',
+                    'X-Browser-FP': 'false'
+                }
+            });
+            const data = await res.json();
+            updateBotStats(data);
+            showWAAPResponse('bot-response', data);
+            refreshLogs('waap');
+        } catch (e) {
+            showErrorResponse('bot-response', e.message);
+        }
+    }
+
+    function updateBotStats(data) {
+        const scoreEl = document.getElementById('bot-score-display');
+        const rpsEl = document.getElementById('bot-rps-display');
+        const statusEl = document.getElementById('bot-status-display');
+
+        const score = data.botScore || 0;
+        scoreEl.textContent = score;
+        scoreEl.className = 'status-value ' + (score > 60 ? 'red' : score > 30 ? 'yellow' : 'green');
+
+        const rps = (data.requestsPerSec || 0).toFixed(1);
+        rpsEl.textContent = rps;
+
+        if (data.blocked && data.challengeIssued) {
+            statusEl.textContent = 'CAPTCHA';
+            statusEl.className = 'status-value yellow';
+        } else if (data.blocked) {
+            statusEl.textContent = 'BLOCKED';
+            statusEl.className = 'status-value red';
+        } else {
+            statusEl.textContent = 'OK';
+            statusEl.className = 'status-value green';
+        }
+    }
+
+    async function refreshTicketStatus() {
+        try {
+            const res = await fetch('/api/tickets/status');
+            const data = await res.json();
+            document.getElementById('bot-remaining').textContent = data.remaining;
+            document.getElementById('bot-total').textContent = data.total;
+            document.getElementById('bot-event-name').textContent = data.event;
+            const pct = (data.remaining / data.total * 100);
+            const bar = document.getElementById('bot-seat-bar');
+            bar.style.width = pct + '%';
+            bar.style.background = pct > 50 ? 'var(--accent-green)' : pct > 20 ? 'var(--accent-yellow)' : 'var(--accent-red)';
+        } catch(e) {}
+    }
+
+    // ========================
+    // WAAP API Calls - DDoS Protection
+    // ========================
+    async function sendDDoSNormal() {
+        try {
+            const res = await fetch('/api/health');
+            const data = await res.json();
+            updateDDoSStats(data);
+            showWAAPResponse('ddos-response', data);
+            refreshLogs('waap');
+        } catch (e) {
+            showErrorResponse('ddos-response', e.message);
+        }
+    }
+
+    async function sendDDoSFlood(count) {
+        const container = document.getElementById('ddos-sim-progress');
+        container.style.display = 'block';
+        container.innerHTML = '';
+        const log = document.createElement('div');
+        log.className = 'sim-progress';
+        container.appendChild(log);
+
+        for (let i = 1; i <= count; i++) {
+            try {
+                const res = await fetch('/api/health');
+                const data = await res.json();
+                updateDDoSStats(data);
+                const line = document.createElement('div');
+                if (data.blocked) {
+                    line.className = 'sim-line blocked';
+                    line.textContent = `[${i}/${count}] BLOCKED - ${data.reason} (${data.requestCount}/${data.threshold} reqs)`;
+                } else {
+                    line.className = 'sim-line ok';
+                    line.textContent = `[${i}/${count}] OK - ${data.status} (${data.requestCount}/${data.threshold} reqs, ${(data.requestsPerSec||0).toFixed(1)} rps)`;
+                }
+                log.appendChild(line);
+                log.scrollTop = log.scrollHeight;
+            } catch (e) {
+                const line = document.createElement('div');
+                line.className = 'sim-line blocked';
+                line.textContent = `[${i}/${count}] Error: ${e.message}`;
+                log.appendChild(line);
+            }
+            await sleep(30);
+        }
+        refreshLogs('waap');
+    }
+
+    function updateDDoSStats(data) {
+        const countEl = document.getElementById('ddos-req-count');
+        const thresholdEl = document.getElementById('ddos-threshold');
+        const statusEl = document.getElementById('ddos-status-display');
+        const bar = document.getElementById('ddos-req-bar');
+
+        const count = data.requestCount || 0;
+        const threshold = data.threshold || 20;
+        countEl.textContent = count;
+        thresholdEl.textContent = threshold;
+
+        const pct = Math.min(100, (count / threshold) * 100);
+        bar.style.width = pct + '%';
+
+        if (data.blocked) {
+            statusEl.textContent = 'BLOCKED';
+            statusEl.className = 'status-value red';
+            bar.style.background = 'var(--accent-red)';
+        } else if (pct > 70) {
+            statusEl.textContent = 'WARNING';
+            statusEl.className = 'status-value yellow';
+            bar.style.background = 'var(--accent-yellow)';
+        } else {
+            statusEl.textContent = 'NORMAL';
+            statusEl.className = 'status-value green';
+            bar.style.background = 'var(--accent-green)';
         }
     }
 
@@ -1007,7 +1688,6 @@
         let html = '';
 
         if (data.blocked) {
-            // WAF Blocked
             html = `
                 <div class="response-area response-blocked">
                     <div class="response-header">
@@ -1026,7 +1706,6 @@
                     </div>
                 </div>`;
         } else if (data.alert === 'CRITICAL') {
-            // Attack succeeded (WAF was off)
             html = `
                 <div class="response-area response-attack">
                     <div class="response-header">
@@ -1043,13 +1722,12 @@
                         ${data.renderedHTML ? `
                             <div class="xss-render-label">Rendered HTML (XSS Vulnerable)</div>
                             <div class="xss-render-area">${data.renderedHTML}</div>
-                            <div class="xss-render-label" style="margin-top:8px">Safe HTML (Escaped)</div>
+                            <div class="xss-render-label" style="margin-top:6px">Safe HTML (Escaped)</div>
                             <div class="xss-render-area">${data.safeHTML || ''}</div>
                         ` : ''}
                     </div>
                 </div>`;
         } else {
-            // Normal response
             html = `
                 <div class="response-area response-passed">
                     <div class="response-header">
@@ -1061,6 +1739,73 @@
                         ${data.output ? `<pre>${escapeHtml(data.output)}</pre>` : ''}
                         ${data.data ? `<pre>${JSON.stringify(data.data, null, 2)}</pre>` : ''}
                         ${data.fileContent ? `<pre>${escapeHtml(data.fileContent)}</pre>` : ''}
+                    </div>
+                </div>`;
+        }
+
+        container.innerHTML = html;
+    }
+
+    function showWAAPResponse(containerId, data) {
+        const container = document.getElementById(containerId);
+        let html = '';
+
+        if (data.blocked && data.challengeIssued) {
+            // CAPTCHA challenge
+            html = `
+                <div class="response-area response-challenge">
+                    <div class="response-header">
+                        <span class="response-icon">&#x1f916;</span>
+                        CAPTCHA CHALLENGE - ${escapeHtml(data.category || '')}
+                    </div>
+                    <div class="response-body">
+                        <div>${escapeHtml(data.message)}</div>
+                        <dl class="response-detail">
+                            <dt>Reason</dt><dd>${escapeHtml(data.reason)}</dd>
+                            <dt>Bot Score</dt><dd>${data.botScore || 0}/100</dd>
+                            <dt>RPS</dt><dd>${(data.requestsPerSec || 0).toFixed(1)}</dd>
+                        </dl>
+                        <pre style="text-align:center;font-size:18px;padding:16px;margin-top:10px;color:#eab308">
+&#x1f916; CAPTCHA Verification Required
+&#x2588;&#x2588;&#x2588; &#x2588;&#x2591;&#x2588; &#x2588;&#x2588;&#x2591; &#x2591;&#x2588;&#x2588;
+Enter the code to prove you are human</pre>
+                    </div>
+                </div>`;
+        } else if (data.blocked) {
+            // Blocked
+            html = `
+                <div class="response-area response-blocked">
+                    <div class="response-header">
+                        <span class="response-icon">&#x1f6e1;</span>
+                        WAAP BLOCKED - ${escapeHtml(data.category || data.reason || '')}
+                    </div>
+                    <div class="response-body">
+                        <div>${escapeHtml(data.message)}</div>
+                        <dl class="response-detail">
+                            ${data.reason ? `<dt>Reason</dt><dd>${escapeHtml(data.reason)}</dd>` : ''}
+                            ${data.description ? `<dt>Description</dt><dd>${escapeHtml(data.description)}</dd>` : ''}
+                            ${data.tokenUser ? `<dt>Token User</dt><dd>${escapeHtml(data.tokenUser)}</dd>` : ''}
+                            ${data.resourceOwner ? `<dt>Resource Owner</dt><dd>${escapeHtml(data.resourceOwner)}</dd>` : ''}
+                            ${data.requestCount != null ? `<dt>Request Count</dt><dd>${data.requestCount}</dd>` : ''}
+                            ${data.rateLimit ? `<dt>Rate Limit</dt><dd>${data.rateLimit}/min</dd>` : ''}
+                            ${data.botScore != null ? `<dt>Bot Score</dt><dd>${data.botScore}/100</dd>` : ''}
+                            ${data.requestsPerSec != null ? `<dt>RPS</dt><dd>${(data.requestsPerSec).toFixed(1)}</dd>` : ''}
+                            ${data.threshold ? `<dt>Threshold</dt><dd>${data.threshold}</dd>` : ''}
+                        </dl>
+                    </div>
+                </div>`;
+        } else {
+            // Passed
+            html = `
+                <div class="response-area response-passed">
+                    <div class="response-header">
+                        <span class="response-icon">&#x2705;</span>
+                        ${escapeHtml(data.message)}
+                    </div>
+                    <div class="response-body">
+                        ${data.data ? `<pre>${JSON.stringify(data.data, null, 2)}</pre>` : ''}
+                        ${data.remaining != null ? `<div style="margin-top:6px">Remaining: <strong>${data.remaining}</strong> / ${data.total}</div>` : ''}
+                        ${data.requestCount != null && data.threshold ? `<div style="margin-top:4px">Requests: ${data.requestCount} / ${data.threshold}</div>` : ''}
                     </div>
                 </div>`;
         }
@@ -1084,40 +1829,65 @@
         return div.innerHTML;
     }
 
-    // ========================
-    // Log Management
-    // ========================
-    let logStats = { blocked: 0, attack: 0, passed: 0 };
+    function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
 
-    async function refreshLogs() {
-        try {
-            const res = await fetch('/api/waf/logs');
-            const logs = await res.json();
-            renderLogs(logs);
-        } catch (e) {
-            console.error('Failed to fetch logs:', e);
+    // ========================
+    // Log Panel Switching
+    // ========================
+    function switchLogTab(type) {
+        document.querySelectorAll('.log-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.log-panel-content').forEach(p => p.classList.remove('active'));
+
+        if (type === 'waf') {
+            document.querySelector('.log-tab:not(.waap)').classList.add('active');
+            document.getElementById('waf-log-panel').classList.add('active');
+        } else {
+            document.querySelector('.log-tab.waap').classList.add('active');
+            document.getElementById('waap-log-panel').classList.add('active');
         }
     }
 
-    function renderLogs(logs) {
-        const logList = document.getElementById('logList');
-        const logEmpty = document.getElementById('logEmpty');
-        const logCount = document.getElementById('logCount');
+    // ========================
+    // Log Management
+    // ========================
+    async function refreshLogs(type) {
+        if (type === 'waf' || !type) {
+            try {
+                const res = await fetch('/api/waf/logs');
+                const logs = await res.json();
+                renderLogs(logs, 'wafLogList', 'wafLogCount', 'wafStatBlocked', 'wafStatPassed');
+            } catch (e) {}
+        }
+        if (type === 'waap' || !type) {
+            try {
+                const res = await fetch('/api/waap/logs');
+                const logs = await res.json();
+                renderLogs(logs, 'waapLogList', 'waapLogCount', 'waapStatBlocked', 'waapStatPassed');
+            } catch (e) {}
+        }
+    }
+
+    function renderLogs(logs, listId, countId, blockedId, passedId) {
+        const logList = document.getElementById(listId);
+        const logCount = document.getElementById(countId);
 
         logCount.textContent = logs.length;
 
         if (logs.length === 0) {
-            logList.innerHTML = '';
-            logList.appendChild(logEmpty.cloneNode(true));
-            logStats = { blocked: 0, attack: 0, passed: 0 };
-            updateStats();
+            logList.innerHTML = `<div class="log-empty">
+                <div class="log-empty-icon">&#x1f6e1;</div>
+                <div>아직 로그가 없습니다</div>
+            </div>`;
+            document.getElementById(blockedId).textContent = '0';
+            document.getElementById(passedId).textContent = '0';
             return;
         }
 
-        logStats = { blocked: 0, attack: 0, passed: 0 };
+        let blocked = 0, passed = 0;
         let html = '';
 
-        // Reverse to show newest first
         for (let i = logs.length - 1; i >= 0; i--) {
             const log = logs[i];
             let type, badge;
@@ -1125,11 +1895,11 @@
             if (log.result.blocked) {
                 type = 'blocked';
                 badge = 'BLOCKED';
-                logStats.blocked++;
+                blocked++;
             } else {
                 type = 'passed';
                 badge = 'PASSED';
-                logStats.passed++;
+                passed++;
             }
 
             html += `
@@ -1142,23 +1912,43 @@
                         ${escapeHtml(log.method)} ${escapeHtml(log.path)}<br>
                         Input: ${escapeHtml(log.input)}
                     </div>
-                    ${log.result.blocked ? `<div class="log-entry-rule">Rule: ${escapeHtml(log.result.ruleName)} | ${escapeHtml(log.result.category)} | Match: ${escapeHtml(log.result.matchedPart)}</div>` : ''}
+                    ${log.result.blocked ? `<div class="log-entry-rule">${escapeHtml(log.result.ruleName)} | ${escapeHtml(log.result.category)}</div>` : ''}
                 </div>`;
         }
 
         logList.innerHTML = html;
-        updateStats();
+        document.getElementById(blockedId).textContent = blocked;
+        document.getElementById(passedId).textContent = passed;
     }
 
-    function updateStats() {
-        document.getElementById('statBlocked').textContent = logStats.blocked;
-        document.getElementById('statAttack').textContent = logStats.attack;
-        document.getElementById('statPassed').textContent = logStats.passed;
+    async function clearLogs(type) {
+        if (type === 'waf') {
+            await fetch('/api/waf/logs/clear', { method: 'POST' });
+        } else {
+            await fetch('/api/waap/logs/clear', { method: 'POST' });
+        }
+        refreshLogs(type);
     }
 
-    async function clearLogs() {
-        await fetch('/api/waf/logs/clear', { method: 'POST' });
-        refreshLogs();
+    async function resetWAAP() {
+        await fetch('/api/waap/reset', { method: 'POST' });
+        await fetch('/api/waap/logs/clear', { method: 'POST' });
+        refreshLogs('waap');
+        refreshTicketStatus();
+        // Reset UI displays
+        document.getElementById('bot-score-display').textContent = '0';
+        document.getElementById('bot-score-display').className = 'status-value green';
+        document.getElementById('bot-rps-display').textContent = '0';
+        document.getElementById('bot-status-display').textContent = 'OK';
+        document.getElementById('bot-status-display').className = 'status-value green';
+        document.getElementById('ddos-req-count').textContent = '0';
+        document.getElementById('ddos-status-display').textContent = 'NORMAL';
+        document.getElementById('ddos-status-display').className = 'status-value green';
+        document.getElementById('ddos-req-bar').style.width = '0%';
+        const simProg = document.getElementById('bot-sim-progress');
+        if (simProg) simProg.style.display = 'none';
+        const ddosProg = document.getElementById('ddos-sim-progress');
+        if (ddosProg) ddosProg.style.display = 'none';
     }
 
     // Enter key support
@@ -1174,6 +1964,7 @@
     // Initial status check
     fetch('/api/waf/status').then(r => r.json()).then(d => updateWAFStatus(d.enabled));
     refreshLogs();
+    refreshTicketStatus();
 </script>
 
 </body>

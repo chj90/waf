@@ -8,12 +8,14 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 )
 
 //go:embed index.html
 var staticFiles embed.FS
 
 var wafEngine *WAFEngine
+var waapEngine *WAAPEngine
 
 // Simulated user database
 var userDB = []map[string]string{
@@ -33,6 +35,21 @@ var productDB = []map[string]string{
 	{"id": "5", "name": "USB-C 허브", "price": "55,000원", "category": "주변기기"},
 }
 
+// Simulated order database (for API Security demo)
+var orderDB = []map[string]string{
+	{"id": "5001", "userId": "user1", "product": "노트북 Pro 15", "amount": "1,500,000원", "status": "배송완료", "address": "서울시 강남구 테헤란로 123"},
+	{"id": "5002", "userId": "user2", "product": "무선 마우스 외 3건", "amount": "285,000원", "status": "배송중", "address": "부산시 해운대구 센텀로 456"},
+	{"id": "5003", "userId": "user3", "product": "기계식 키보드", "amount": "89,000원", "status": "결제완료", "address": "대전시 유성구 대학로 789"},
+	{"id": "5004", "userId": "user4", "product": "27인치 모니터", "amount": "450,000원", "status": "배송완료", "address": "인천시 연수구 송도로 321"},
+	{"id": "5005", "userId": "user5", "product": "USB-C 허브 외 1건", "amount": "110,000원", "status": "주문접수", "address": "광주시 서구 상무로 654"},
+}
+
+// Ticket state (for Bot Management demo)
+var ticketMu sync.Mutex
+var ticketRemaining = 487
+var ticketTotal = 500
+var ticketEvent = "2025 Super Concert"
+
 // Simulated file system
 var fakeFiles = map[string]string{
 	"readme.txt":        "WAF 데모 애플리케이션입니다.\n버전: 1.0\n작성일: 2024-01-01",
@@ -46,17 +63,24 @@ var fakeFiles = map[string]string{
 
 func main() {
 	wafEngine = NewWAFEngine()
+	waapEngine = NewWAAPEngine()
 
 	mux := http.NewServeMux()
 
 	// Pages
 	mux.HandleFunc("/", handleIndex)
 
-	// Vulnerable endpoints
+	// Vulnerable endpoints (WAF demo)
 	mux.HandleFunc("/api/login", handleLogin)
 	mux.HandleFunc("/api/search", handleSearch)
 	mux.HandleFunc("/api/file", handleFile)
 	mux.HandleFunc("/api/ping", handlePing)
+
+	// WAAP endpoints
+	mux.HandleFunc("/api/orders", handleOrders)
+	mux.HandleFunc("/api/tickets/purchase", handleTicketPurchase)
+	mux.HandleFunc("/api/tickets/status", handleTicketStatus)
+	mux.HandleFunc("/api/health", handleHealth)
 
 	// WAF control
 	mux.HandleFunc("/api/waf/toggle", handleWAFToggle)
@@ -64,12 +88,22 @@ func main() {
 	mux.HandleFunc("/api/waf/logs", handleWAFLogs)
 	mux.HandleFunc("/api/waf/logs/clear", handleWAFLogsClear)
 
+	// WAAP control
+	mux.HandleFunc("/api/waap/status", handleWAAPStatus)
+	mux.HandleFunc("/api/waap/api-security/toggle", handleAPISecurityToggle)
+	mux.HandleFunc("/api/waap/bot-mgmt/toggle", handleBotMgmtToggle)
+	mux.HandleFunc("/api/waap/ddos/toggle", handleDDoSToggle)
+	mux.HandleFunc("/api/waap/reset", handleWAAPReset)
+	mux.HandleFunc("/api/waap/logs", handleWAAPLogs)
+	mux.HandleFunc("/api/waap/logs/clear", handleWAAPLogsClear)
+
 	fmt.Println("==============================================")
-	fmt.Println("  WAF Demo Server")
+	fmt.Println("  WAAP Demo Server")
 	fmt.Println("  http://localhost:8080")
 	fmt.Println("==============================================")
 	fmt.Println()
 	fmt.Println("  WAF Status: ON")
+	fmt.Println("  WAAP Modules: API Security / Bot Mgmt / DDoS")
 	fmt.Println("  Press Ctrl+C to stop")
 	fmt.Println()
 
@@ -427,5 +461,344 @@ func jsonError(w http.ResponseWriter, message string, status int) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": false,
 		"message": message,
+	})
+}
+
+// ============================================================
+// WAAP Handlers - API Security
+// ============================================================
+
+func handleOrders(w http.ResponseWriter, r *http.Request) {
+	orderID := r.URL.Query().Get("id")
+	if orderID == "" {
+		jsonError(w, "주문번호를 입력해주세요", 400)
+		return
+	}
+
+	// Simulated authentication: X-User-Token header
+	tokenUser := r.Header.Get("X-User-Token")
+	if tokenUser == "" {
+		tokenUser = "user1" // default
+	}
+
+	// Rate limit check first
+	rateLimited, reqCount := waapEngine.APISecurity.CheckRateLimit(tokenUser)
+	if rateLimited {
+		result := WAFResult{
+			Blocked:     true,
+			RuleName:    "API-RATE",
+			Category:    "API Rate Limit",
+			MatchedPart: fmt.Sprintf("%d requests", reqCount),
+			Description: fmt.Sprintf("API 호출 횟수 초과 (%d/%d) - 비정상적인 대량 조회 차단", reqCount, waapEngine.APISecurity.rateLimit),
+			Severity:    "MEDIUM",
+		}
+		waapEngine.AddLog(r.Method, r.URL.Path, fmt.Sprintf("order=%s token=%s", orderID, tokenUser), r.RemoteAddr, result)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(429)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":      false,
+			"blocked":      true,
+			"reason":       "RATE_LIMIT",
+			"message":      fmt.Sprintf("[WAAP] API Rate Limit 초과 - %d/%d회 요청 차단", reqCount, waapEngine.APISecurity.rateLimit),
+			"requestCount": reqCount,
+			"rateLimit":    waapEngine.APISecurity.rateLimit,
+			"category":     "API Rate Limit",
+		})
+		return
+	}
+
+	// Find the order
+	var order map[string]string
+	for _, o := range orderDB {
+		if o["id"] == orderID {
+			order = o
+			break
+		}
+	}
+
+	if order == nil {
+		result := WAFResult{Blocked: false}
+		waapEngine.AddLog(r.Method, r.URL.Path, fmt.Sprintf("order=%s token=%s", orderID, tokenUser), r.RemoteAddr, result)
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":  false,
+			"blocked":  false,
+			"message":  fmt.Sprintf("주문번호 '%s'을(를) 찾을 수 없습니다", orderID),
+			"category": "API Security",
+		})
+		return
+	}
+
+	// BOLA check
+	isBOLA := waapEngine.APISecurity.CheckBOLA(tokenUser, order["userId"])
+	if isBOLA {
+		result := WAFResult{
+			Blocked:     true,
+			RuleName:    "API-BOLA",
+			Category:    "API Security (BOLA)",
+			MatchedPart: fmt.Sprintf("token=%s, owner=%s", tokenUser, order["userId"]),
+			Description: fmt.Sprintf("인증 토큰(%s)과 리소스 소유자(%s) 불일치 - 타인의 주문 정보 접근 차단", tokenUser, order["userId"]),
+			Severity:    "HIGH",
+		}
+		waapEngine.AddLog(r.Method, r.URL.Path, fmt.Sprintf("order=%s token=%s", orderID, tokenUser), r.RemoteAddr, result)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(403)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":        false,
+			"blocked":        true,
+			"reason":         "BOLA",
+			"message":        fmt.Sprintf("[WAAP] BOLA 탐지 - 사용자 '%s'이(가) '%s' 소유의 주문에 접근 시도", tokenUser, order["userId"]),
+			"tokenUser":      tokenUser,
+			"resourceOwner":  order["userId"],
+			"category":       "API Security (BOLA)",
+			"description":    "인증 토큰의 사용자 ID와 주문 소유자 불일치 탐지",
+			"requestCount":   reqCount,
+		})
+		return
+	}
+
+	// Access allowed
+	result := WAFResult{Blocked: false}
+	waapEngine.AddLog(r.Method, r.URL.Path, fmt.Sprintf("order=%s token=%s", orderID, tokenUser), r.RemoteAddr, result)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":      true,
+		"blocked":      false,
+		"message":      fmt.Sprintf("주문 #%s 조회 성공", orderID),
+		"data":         order,
+		"tokenUser":    tokenUser,
+		"requestCount": reqCount,
+		"category":     "API Security",
+	})
+}
+
+// ============================================================
+// WAAP Handlers - Bot Management
+// ============================================================
+
+func handleTicketPurchase(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonError(w, "Method not allowed", 405)
+		return
+	}
+
+	hasMouseEvents := r.Header.Get("X-Mouse-Events") == "true"
+	hasBrowserFP := r.Header.Get("X-Browser-FP") == "true"
+
+	botResult := waapEngine.BotMgmt.AnalyzeRequest(r.RemoteAddr, hasMouseEvents, hasBrowserFP)
+
+	if botResult.Blocked {
+		result := WAFResult{
+			Blocked:     true,
+			RuleName:    "BOT-" + botResult.Reason,
+			Category:    "Bot Management",
+			MatchedPart: fmt.Sprintf("score=%d, rps=%.1f", botResult.BotScore, botResult.RequestsPerSec),
+			Description: botResult.Description,
+			Severity:    "HIGH",
+		}
+		waapEngine.AddLog(r.Method, r.URL.Path, fmt.Sprintf("mouse=%v fp=%v", hasMouseEvents, hasBrowserFP), r.RemoteAddr, result)
+
+		status := 403
+		if botResult.ChallengeIssued {
+			status = 423 // Locked - CAPTCHA required
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":         false,
+			"blocked":         true,
+			"challengeIssued": botResult.ChallengeIssued,
+			"reason":          botResult.Reason,
+			"message":         fmt.Sprintf("[WAAP] Bot 탐지 - %s", botResult.Description),
+			"botScore":        botResult.BotScore,
+			"requestsPerSec":  botResult.RequestsPerSec,
+			"category":        "Bot Management",
+		})
+		return
+	}
+
+	// Purchase successful
+	ticketMu.Lock()
+	purchased := false
+	if ticketRemaining > 0 {
+		ticketRemaining--
+		purchased = true
+	}
+	remaining := ticketRemaining
+	ticketMu.Unlock()
+
+	result := WAFResult{Blocked: false}
+	waapEngine.AddLog(r.Method, r.URL.Path, fmt.Sprintf("mouse=%v fp=%v", hasMouseEvents, hasBrowserFP), r.RemoteAddr, result)
+
+	if purchased {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":        true,
+			"blocked":        false,
+			"message":        fmt.Sprintf("티켓 구매 성공! (%s)", ticketEvent),
+			"remaining":      remaining,
+			"total":          ticketTotal,
+			"botScore":       botResult.BotScore,
+			"requestsPerSec": botResult.RequestsPerSec,
+			"category":       "Bot Management",
+		})
+	} else {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":   false,
+			"blocked":   false,
+			"message":   "매진되었습니다",
+			"remaining": 0,
+			"total":     ticketTotal,
+			"category":  "Bot Management",
+		})
+	}
+}
+
+func handleTicketStatus(w http.ResponseWriter, r *http.Request) {
+	ticketMu.Lock()
+	remaining := ticketRemaining
+	ticketMu.Unlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"event":     ticketEvent,
+		"total":     ticketTotal,
+		"remaining": remaining,
+	})
+}
+
+// ============================================================
+// WAAP Handlers - DDoS Protection
+// ============================================================
+
+func handleHealth(w http.ResponseWriter, r *http.Request) {
+	ddosResult := waapEngine.DDoSProtect.CheckFlood(r.RemoteAddr)
+
+	if ddosResult.Blocked {
+		result := WAFResult{
+			Blocked:     true,
+			RuleName:    "DDOS-" + ddosResult.Reason,
+			Category:    "DDoS Protection",
+			MatchedPart: fmt.Sprintf("reqs=%d, rps=%.1f", ddosResult.RequestCount, ddosResult.RequestsPerSec),
+			Description: ddosResult.Description,
+			Severity:    "HIGH",
+		}
+		waapEngine.AddLog(r.Method, r.URL.Path, fmt.Sprintf("requests=%d", ddosResult.RequestCount), r.RemoteAddr, result)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(429)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":        false,
+			"blocked":        true,
+			"reason":         ddosResult.Reason,
+			"message":        fmt.Sprintf("[WAAP] DDoS 차단 - %s", ddosResult.Description),
+			"requestCount":   ddosResult.RequestCount,
+			"threshold":      ddosResult.Threshold,
+			"requestsPerSec": ddosResult.RequestsPerSec,
+			"category":       "DDoS Protection",
+		})
+		return
+	}
+
+	result := WAFResult{Blocked: false}
+	waapEngine.AddLog(r.Method, r.URL.Path, "health check", r.RemoteAddr, result)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":        true,
+		"blocked":        false,
+		"message":        "Service OK",
+		"status":         "healthy",
+		"requestCount":   ddosResult.RequestCount,
+		"threshold":      ddosResult.Threshold,
+		"requestsPerSec": ddosResult.RequestsPerSec,
+		"category":       "DDoS Protection",
+	})
+}
+
+// ============================================================
+// WAAP Control Handlers
+// ============================================================
+
+func handleWAAPStatus(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(waapEngine.Status())
+}
+
+func handleAPISecurityToggle(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonError(w, "Method not allowed", 405)
+		return
+	}
+	newState := waapEngine.APISecurity.Toggle()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"enabled": newState,
+		"module":  "API Security",
+	})
+}
+
+func handleBotMgmtToggle(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonError(w, "Method not allowed", 405)
+		return
+	}
+	newState := waapEngine.BotMgmt.Toggle()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"enabled": newState,
+		"module":  "Bot Management",
+	})
+}
+
+func handleDDoSToggle(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonError(w, "Method not allowed", 405)
+		return
+	}
+	newState := waapEngine.DDoSProtect.Toggle()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"enabled": newState,
+		"module":  "DDoS Protection",
+	})
+}
+
+func handleWAAPReset(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonError(w, "Method not allowed", 405)
+		return
+	}
+	waapEngine.Reset()
+	// Reset ticket count too
+	ticketMu.Lock()
+	ticketRemaining = 487
+	ticketMu.Unlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message": "WAAP 상태가 초기화되었습니다",
+	})
+}
+
+func handleWAAPLogs(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(waapEngine.GetLogs())
+}
+
+func handleWAAPLogsClear(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonError(w, "Method not allowed", 405)
+		return
+	}
+	waapEngine.ClearLogs()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message": "WAAP 로그가 삭제되었습니다",
 	})
 }
